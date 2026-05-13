@@ -12,4 +12,4 @@ rand = "*"
 opt-level = 3
 
 [features]
-dev = ["bevy/dynamic_linking"]
+dev = ["bevy/dynamic_linking", "bevy/debug"]
