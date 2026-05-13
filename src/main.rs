@@ -1,4 +1,6 @@
 use bevy::{audio::Volume, input::{common_conditions::input_just_pressed, mouse::AccumulatedMouseMotion}, prelude::*, window::{CursorOptions, PrimaryWindow, WindowFocused}};
+// use bevy_rapier3d::{geometry::{Collider, Restitution}, plugin::{NoUserData, RapierPhysicsPlugin}, rapier::dynamics::RigidBody, render::RapierDebugRenderPlugin};
+use bevy_rapier3d::prelude::*;
 use rand::{SeedableRng, seq::IndexedRandom};
 
 fn round_to(value: f32, decimal_places: i32) -> f32 {
@@ -6,35 +8,18 @@ fn round_to(value: f32, decimal_places: i32) -> f32 {
     (value * factor).round() / factor
 }
 
-#[derive(Debug, Default)]
-struct Collisions {
-    north: bool,
-    south: bool,
-    east: bool,
-    west: bool,
-    up: bool,
-    down: bool   
-}
-
 fn main() {
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins);
+    app.add_plugins((DefaultPlugins, RapierPhysicsPlugin::<NoUserData>::default(), RapierDebugRenderPlugin::default()));
     app.add_systems(Startup, (
         spawn_camera,
         load_sfx,
         spawn_map,
         spawn_menu,
-        spawn_hud)
+        spawn_hud,
+        setup_physics)
     .chain());
     app.insert_resource(Time::<Fixed>::from_hz(60.));
-    app.add_systems(FixedUpdate,(
-        is_collised,
-        apply_velocity.after(is_collised),
-        apply_gravity.before(apply_velocity).after(is_collised),
-        bounce.after(apply_velocity),
-        apply_player_velocity.after(is_collised),
-        apply_player_gravity.before(apply_player_velocity).after(is_collised)
-    ));
     app.add_systems(Update, 
         (player_look,
             player_move.after(player_look),
@@ -116,9 +101,6 @@ impl FromWorld for BallData {
     }
 }
 
-#[derive(Component, Deref, DerefMut)]
-struct Velocity(Vec3);
-
 #[derive(Resource)]
 struct Power {
     charging: bool,
@@ -134,23 +116,6 @@ struct PowerBar {
 const NOT_CHARGING: Color = Color::linear_rgb(0.2, 0.2, 0.2);
 const MIN_FILL: f32 = 12.5 / 10.;
 const EMPTY_SPACE: f32 = 12.5 - MIN_FILL;
-
-#[derive(Component)]
-struct Hitbox {
-    coords_gap: Vec3,
-    size: Vec3,
-    collisions: Collisions
-}
-
-impl Hitbox {
-    fn new(coords_gap: Vec3, x_length: f32, y_length: f32, z_length: f32) -> Self {
-        Self {
-            coords_gap,
-            size: Vec3::new(x_length, y_length, z_length),
-            collisions: Collisions::default()
-        }
-    }
-}
 
 #[derive(Resource)]
 struct SoundEffects {
@@ -174,11 +139,18 @@ fn load_sfx(
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((
-        Transform::from_translation(Vec3::new(0., 5., 0.)),
-        Camera3d::default(),
+        Transform::from_translation(Vec3::new(0., 50., 0.)),
         Player::default(),
-        Velocity(Vec3::ZERO),
-        Hitbox::new(Vec3::new(0., -2.5, 0.), 2.5, 5., 2.5)
+        RigidBody::Dynamic,
+        Velocity::zero(),
+        Collider::cuboid(2.5, 5., 2.5),
+        GravityScale(10.),
+        LockedAxes::ROTATION_LOCKED
+    )).with_child((
+        Camera3d::default(),
+        Transform::from_translation(Vec3::new(0., 2.5, 0.)),
+        InheritedVisibility::default(),
+        ViewVisibility::default(),
     ));
 }
 
@@ -195,17 +167,17 @@ fn spawn_map(
             Transform::from_translation(Vec3::new((-8. + h as f32) * 2., 5., -30.)),
             Mesh3d(ball_data.mesh()),
             MeshMaterial3d(ball_data.materials[h].clone()),
-            Hitbox::new(Vec3::ZERO, 2., 2., 2.)
+            Collider::ball(1.)
         ));
     }
     commands.spawn((
-        Transform::from_translation(Vec3::new(0., -10., 0.)),
-        Mesh3d(meshes.add(Cuboid::new(2500., 20., 2500.))),
+        Transform::from_translation(Vec3::new(0., 0., 0.)),
+        Mesh3d(meshes.add(Cuboid::new(5000., 1., 5000.))),
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: Color::linear_rgb(1., 0., 0.),
             ..Default::default()
         })),
-        Hitbox::new(Vec3::ZERO, 2500., 20., 2500.)
+        Collider::cuboid(2500., 0.1, 2500.)
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(30., 10., 0.)),
@@ -214,7 +186,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 0.),
             ..Default::default()
         })),
-        Hitbox::new(Vec3::ZERO, 10., 100., 10.)
+        Collider::cuboid(5., 50., 5.)
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(-30., 11., 0.)),
@@ -223,7 +195,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Hitbox::new(Vec3::ZERO, 10., 10., 10.)
+        Collider::cuboid(5., 5., 5.)
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(-30., 20., -20.)),
@@ -232,7 +204,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Hitbox::new(Vec3::ZERO, 10., 10., 10.)
+        Collider::cuboid(5., 5., 5.)
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(-30., 9.5, 20.)),
@@ -241,11 +213,12 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Hitbox::new(Vec3::ZERO, 10., 10., 10.)
+        Collider::cuboid(5., 5., 5.)
     ));
     commands.spawn((
         SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(50., 0., 50.)).with_scale(Vec3::splat(0.04))
+        Transform::from_translation(Vec3::new(50., 0., 50.)).with_scale(Vec3::splat(0.04)),
+        Collider::cuboid(5., 5., 5.)
     ));
 }
 
@@ -509,21 +482,27 @@ fn update_power_bar(
     }
 }
 
+// player_look — sépare yaw (parent) et pitch (enfant caméra)
 fn player_look(
-    mut player: Single<&mut Transform, With<Player>>,
+    mut player: Single<&mut Transform, (With<Player>, Without<Camera3d>)>,
+    mut camera: Single<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mouse_motion: Res<AccumulatedMouseMotion>,
     time: Res<Time>,
     window: Single<&Window, With<PrimaryWindow>>
 ) {
-    if !window.focused { return;}
+    if !window.focused { return; }
     let dt = time.delta_secs();
     let sensitivity = 100. / window.width().min(window.height());
-    use EulerRot::YXZ;
-    let (mut yaw, mut pitch, _) = player.rotation.to_euler(YXZ);
-    pitch -= mouse_motion.delta.y * dt * sensitivity;
-    yaw -= mouse_motion.delta.x * dt * sensitivity;
-    pitch = pitch.clamp(-1.57, 1.57);
-    player.rotation = Quat::from_euler(YXZ, yaw, pitch, 0.);
+
+    // Yaw sur le parent (joueur)
+    let (yaw, _, _) = player.rotation.to_euler(EulerRot::YXZ);
+    let new_yaw = yaw - mouse_motion.delta.x * dt * sensitivity;
+    player.rotation = Quat::from_rotation_y(new_yaw);
+
+    // Pitch sur la caméra enfant
+    let (_, pitch, _) = camera.rotation.to_euler(EulerRot::YXZ);
+    let new_pitch = (pitch - mouse_motion.delta.y * dt * sensitivity).clamp(-1.57, 1.57);
+    camera.rotation = Quat::from_rotation_x(new_pitch);
 }
 
 fn apply_grab(
@@ -558,7 +537,7 @@ fn toggle_grab(
 }
 
 fn player_move(
-    player: Single<(&mut Transform, &mut Player, &mut Velocity, &mut Hitbox), With<Player>>,
+    player: Single<(&mut Transform, &mut Player, &mut Velocity, &mut GravityScale), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
@@ -569,9 +548,10 @@ fn player_move(
     if cursor.visible {
         return;
     }
+    println!("TGTPABOPUT1");
     let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) { 3. } else { 1. };
     let mut delta = Vec3::ZERO;
-    let (mut transform, mut player_data, mut velocity, hitbox) = player.into_inner();
+    let (mut transform, mut player_data, mut velocity, mut gravity) = player.into_inner();
     if input.pressed(KeyCode::KeyA) {
         delta.x -= 1.;
     }
@@ -591,8 +571,8 @@ fn player_move(
     // fly or jump depending on player gamemode
     if player_data.creative && input.pressed(KeyCode::Space) {
         to_move.y += 1.;
-    } else if input.pressed(KeyCode::Space) && hitbox.collisions.down {
-        velocity.y = player_data.velocity.y;
+    } else if input.pressed(KeyCode::Space) {
+        velocity.linvel.y = player_data.velocity.y;
         to_move.y += 1.;
         commands.spawn((
             InGameSfx,
@@ -603,23 +583,29 @@ fn player_move(
     if player_data.creative && (input.pressed(KeyCode::ControlLeft) || mouse_input.pressed(MouseButton::Forward)) && !player_data.sneaking {
         to_move.y -= 1.;
     }
+
+    if player_data.creative {
+        gravity.0 = 0.;
+    } else {
+        gravity.0 = 10.
+    }
     if input.just_pressed(KeyCode::KeyQ) {
         player_data.creative = !player_data.creative;
-        *velocity = Velocity(Vec3::ZERO);
+        *velocity = Velocity::zero();
     }
     to_move = to_move.normalize_or_zero();
-    if !player_data.creative {
-        if to_move.x > 0. && hitbox.collisions.east { to_move.x = 0.};
-        if to_move.x < 0. && hitbox.collisions.west { to_move.x = 0.};
-        if to_move.z > 0. && hitbox.collisions.north { to_move.z = 0.};
-        if to_move.z < 0. && hitbox.collisions.south { to_move.z = 0.};
-    }
+    // if !player_data.creative {
+    //     if to_move.x > 0. && hitbox.collisions.east { to_move.x = 0.};
+    //     if to_move.x < 0. && hitbox.collisions.west { to_move.x = 0.};
+    //     if to_move.z > 0. && hitbox.collisions.north { to_move.z = 0.};
+    //     if to_move.z < 0. && hitbox.collisions.south { to_move.z = 0.};
+    // }
     if player_data.creative {
         transform.translation += to_move * time.delta_secs() * player_data.speed * speed_multiplier;
     } else {
         let futur_move = to_move * player_data.speed * speed_multiplier;
-        velocity.x = futur_move.x;
-        velocity.z = futur_move.z;
+        velocity.linvel.x = futur_move.x;
+        velocity.linvel.z = futur_move.z;
     }
     if !player_data.creative && (input.just_pressed(KeyCode::ControlLeft) || mouse_input.just_pressed(MouseButton::Forward)) && !player_data.sneaking {
         transform.translation.y -= 1.;
@@ -643,8 +629,16 @@ fn spawn_ball(
             Transform::from_translation(spawn.position),
             Mesh3d(ball_data.mesh()),
             MeshMaterial3d(ball_data.material()),
-            Velocity(spawn.velocity * spawn.power * 5.),
-            Hitbox::new(Vec3::ZERO, 2., 2., 2.)
+            Collider::ball(1.),
+            RigidBody::Dynamic,
+            Velocity {
+                linvel: spawn.velocity * spawn.power * 20.,
+                angvel: Vec3::ZERO
+            },
+            GravityScale(50.),
+            Ccd::enabled()
+            // Velocity(spawn.velocity * spawn.power * 5.),
+            // Hitbox::new(Vec3::ZERO, 2., 2., 2.)
         ));
         commands.spawn((
             InGameSfx,
@@ -657,7 +651,8 @@ fn spawn_ball(
 
 fn shoot_ball(
     mouse_inputs: Res<ButtonInput<MouseButton>>,
-    player: Single<(&mut Transform, &mut Player), With<Player>>,
+    player: Single<&mut Transform, (With<Player>, Without<Camera3d>)>,
+    player_cam: Single<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mut spawner: MessageWriter<BallSpawn>,
     cursor: Single<&CursorOptions, With<PrimaryWindow>>,
     mut power: ResMut<Power>,
@@ -669,8 +664,8 @@ fn shoot_ball(
     if power.charging {
         if mouse_inputs.just_released(MouseButton::Left) {
             spawner.write(BallSpawn {
-                position: player.0.translation,
-                velocity: player.0.forward().as_vec3() * 2.5,
+                position: player.transform_point(player_cam.translation),
+                velocity: player.rotation * player_cam.forward().as_vec3() * 2.5,
                 power: (power.current * 2.).exp()
             });
         }
@@ -687,129 +682,147 @@ fn shoot_ball(
     }
 }
 
-fn apply_velocity(
-    mut objects: Query<(&mut Transform, &mut Velocity), Without<Player>>,
-    time: Res<Time>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+// fn apply_velocity(
+//     mut objects: Query<(&mut Transform, &mut Velocity), Without<Player>>,
+//     time: Res<Time>,
+//     cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+// ) {
+//     if cursor.visible { return; }
+//     for (mut transform, velocity) in &mut objects {
+//         transform.translation += velocity.0 * time.delta_secs();
+//     }
+// }
+
+// const GRAVITY: Vec3 = Vec3::new(0., -9.8, 0.);
+// fn apply_gravity(
+//     mut objects: Query<(&mut Velocity, &Hitbox), Without<Player>>,
+//     cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+//     time: Res<Time>
+// ) {
+//     if cursor.visible { return; }
+//     let g = GRAVITY * time.delta_secs() * 50.;
+//     for (mut v, hitbox) in &mut objects {
+//         if !hitbox.collisions.down {
+//             **v += g;
+//         }
+//     }
+// }
+
+// fn bounce(
+//     mut balls: Query<(&Hitbox, &mut Velocity), Without<Player>>,
+// ) {
+//     for (hitbox, mut velocity) in &mut balls {
+//         if hitbox.collisions.down || hitbox.collisions.up {
+//             velocity.y *= -0.75;
+//         }
+//         if hitbox.collisions.north || hitbox.collisions.south {
+//             velocity.z *= -1.;
+//         }
+//         if hitbox.collisions.west || hitbox.collisions.east {
+//             velocity.x *= -1.
+//         }
+//         velocity.x *= 0.99;
+//         velocity.z *= 0.99;
+//     }
+// }
+
+// fn apply_player_velocity(
+//     mut players: Query<(&mut Transform, &Velocity, &Player)>,
+//     time: Res<Time>,
+//     cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+// ) {
+//     if cursor.visible { return; }
+//     for (mut transform, velocity, player_data) in &mut players {
+//         if !player_data.creative {
+//             transform.translation += velocity.0 * time.delta_secs();
+//         }
+//     }
+// }
+
+// fn apply_player_gravity(
+//     mut players: Query<(&mut Velocity, &Hitbox, &Player)>,
+//     time: Res<Time>,
+//     cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+// ) {
+//     if cursor.visible { return; }
+//     let g = GRAVITY * time.delta_secs() * 10.;
+//     for (mut velocity, hitbox, player) in &mut players {
+//         if !player.creative {
+//             if hitbox.collisions.down {
+//                 velocity.y *= 0.;
+//             } else if hitbox.collisions.up {
+//                 velocity.y *= 0.;
+//                 **velocity += g;
+//             } else {
+//                 **velocity += g;
+//             }
+//         }
+//     }
+// }
+
+// fn is_collised(
+//     objects: Query<(&Transform, &Hitbox), Without<Velocity>>, 
+//     mut moving_objects: Query<(&Transform, &mut Hitbox, &Velocity)>,
+//     time: Res<Time>
+// ) {
+//     for (mov_coords, mut mov_hit, velo) in &mut moving_objects {
+//         let center1 = mov_coords.translation + mov_hit.coords_gap + **velo * time.delta_secs();
+//         let a_min = center1 - mov_hit.size / 2.;
+//         let a_max = center1 + mov_hit.size / 2.;
+//         let mut collides = Collisions::default();
+
+//         for (object_coords, object_hit) in &objects {
+//             let center2 = object_coords.translation + object_hit.coords_gap;
+//             let b_min = center2 - object_hit.size / 2.;
+//             let b_max = center2 + object_hit.size / 2.;
+
+//             let overlap_x = a_max.x.min(b_max.x) - a_min.x.max(b_min.x);
+//             let overlap_y = a_max.y.min(b_max.y) - a_min.y.max(b_min.y);
+//             let overlap_z = a_max.z.min(b_max.z) - a_min.z.max(b_min.z);
+
+//             if overlap_x > 0. && overlap_y > 0. && overlap_z > 0. {
+//                 if overlap_y <= overlap_x && overlap_y <= overlap_z {
+//                     // Vertical collisions
+//                     if center1.y > center2.y {
+//                         collides.down = true; // floor
+//                     } else {
+//                         collides.up = true;   // roof
+//                     }
+//                 } else if overlap_x <= overlap_y && overlap_x <= overlap_z {
+//                     //  X horizontal collision
+//                     if center1.x > center2.x {
+//                         collides.west = true;
+//                     } else {
+//                         collides.east = true;
+//                     }
+//                 } else {
+//                     // Z horizontale collision
+//                     if center1.z > center2.z {
+//                         collides.south = true;
+//                     } else {
+//                         collides.north = true;
+//                     }
+//                 }
+//             }
+//         }
+//         mov_hit.collisions = collides;
+//     }
+// }
+
+fn setup_physics(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>
 ) {
-    if cursor.visible { return; }
-    for (mut transform, velocity) in &mut objects {
-        transform.translation += velocity.0 * time.delta_secs();
-    }
-}
-
-const GRAVITY: Vec3 = Vec3::new(0., -9.8, 0.);
-fn apply_gravity(
-    mut objects: Query<(&mut Velocity, &Hitbox), Without<Player>>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
-    time: Res<Time>
-) {
-    if cursor.visible { return; }
-    let g = GRAVITY * time.delta_secs() * 50.;
-    for (mut v, hitbox) in &mut objects {
-        if !hitbox.collisions.down {
-            **v += g;
-        }
-    }
-}
-
-fn bounce(
-    mut balls: Query<(&Hitbox, &mut Velocity), Without<Player>>,
-) {
-    for (hitbox, mut velocity) in &mut balls {
-        if hitbox.collisions.down || hitbox.collisions.up {
-            velocity.y *= -0.75;
-        }
-        if hitbox.collisions.north || hitbox.collisions.south {
-            velocity.z *= -1.;
-        }
-        if hitbox.collisions.west || hitbox.collisions.east {
-            velocity.x *= -1.
-        }
-        velocity.x *= 0.99;
-        velocity.z *= 0.99;
-    }
-}
-
-fn apply_player_velocity(
-    mut players: Query<(&mut Transform, &Velocity, &Player)>,
-    time: Res<Time>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
-) {
-    if cursor.visible { return; }
-    for (mut transform, velocity, player_data) in &mut players {
-        if !player_data.creative {
-            transform.translation += velocity.0 * time.delta_secs();
-        }
-    }
-}
-
-fn apply_player_gravity(
-    mut players: Query<(&mut Velocity, &Hitbox, &Player)>,
-    time: Res<Time>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
-) {
-    if cursor.visible { return; }
-    let g = GRAVITY * time.delta_secs() * 10.;
-    for (mut velocity, hitbox, player) in &mut players {
-        if !player.creative {
-            if hitbox.collisions.down {
-                velocity.y *= 0.;
-            } else if hitbox.collisions.up {
-                velocity.y *= 0.;
-                **velocity += g;
-            } else {
-                **velocity += g;
-            }
-        }
-    }
-}
-
-fn is_collised(
-    objects: Query<(&Transform, &Hitbox), Without<Velocity>>, 
-    mut moving_objects: Query<(&Transform, &mut Hitbox, &Velocity)>,
-    time: Res<Time>
-) {
-    for (mov_coords, mut mov_hit, velo) in &mut moving_objects {
-        let center1 = mov_coords.translation + mov_hit.coords_gap + **velo * time.delta_secs();
-        let a_min = center1 - mov_hit.size / 2.;
-        let a_max = center1 + mov_hit.size / 2.;
-        let mut collides = Collisions::default();
-
-        for (object_coords, object_hit) in &objects {
-            let center2 = object_coords.translation + object_hit.coords_gap;
-            let b_min = center2 - object_hit.size / 2.;
-            let b_max = center2 + object_hit.size / 2.;
-
-            let overlap_x = a_max.x.min(b_max.x) - a_min.x.max(b_min.x);
-            let overlap_y = a_max.y.min(b_max.y) - a_min.y.max(b_min.y);
-            let overlap_z = a_max.z.min(b_max.z) - a_min.z.max(b_min.z);
-
-            if overlap_x > 0. && overlap_y > 0. && overlap_z > 0. {
-                if overlap_y <= overlap_x && overlap_y <= overlap_z {
-                    // Vertical collisions
-                    if center1.y > center2.y {
-                        collides.down = true; // floor
-                    } else {
-                        collides.up = true;   // roof
-                    }
-                } else if overlap_x <= overlap_y && overlap_x <= overlap_z {
-                    //  X horizontal collision
-                    if center1.x > center2.x {
-                        collides.west = true;
-                    } else {
-                        collides.east = true;
-                    }
-                } else {
-                    // Z horizontale collision
-                    if center1.z > center2.z {
-                        collides.south = true;
-                    } else {
-                        collides.north = true;
-                    }
-                }
-            }
-        }
-        mov_hit.collisions = collides;
-    }
+    /* Create the bouncing ball. */
+    commands
+        .spawn(RigidBody::Dynamic)
+        .insert(Collider::ball(0.5))
+        .insert(Restitution::coefficient(0.7))
+        .insert(Transform::from_xyz(0.0, 50., 0.0))
+        .insert(Mesh3d(meshes.add(Cuboid::new(2.5, 5., 2.5))))
+        .insert(MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(0., 0., 1.),
+            ..Default::default() 
+        })));
 }
