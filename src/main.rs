@@ -132,7 +132,7 @@ fn load_sfx(
     commands.insert_resource(SoundEffects {
         jump: asset_server.load("audios/mario-jump.mp3"),
         shotgun: asset_server.load("audios/spas12.mp3"),
-        main_theme: asset_server.load("audios/dexter-meme.ogg"),
+        main_theme: asset_server.load("audios/dexter-blood-theme.mp3"),
         in_game_theme: asset_server.load("audios/portal-radio.mp3")
     });
 }
