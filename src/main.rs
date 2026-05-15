@@ -23,6 +23,8 @@ fn main() {
     app.add_systems(Update, 
         (player_look,
             player_move.after(player_look),
+            player_sneak.before(PhysicsSet::SyncBackend),
+            player_jump.before(PhysicsSet::SyncBackend),
             focus_event,
             toggle_grab.run_if(input_just_pressed(KeyCode::Escape)),
             spawn_ball,
@@ -56,6 +58,9 @@ impl Default for Player {
         Player { speed: 50., creative: false, velocity: Vec3::Y * 20., sneaking: false }
     }
 }
+
+#[derive(Component)]
+struct PlayerCollider;
 
 #[derive(Event, Deref)]
 struct GrabEvent(bool);
@@ -143,14 +148,20 @@ fn spawn_camera(mut commands: Commands) {
         Player::default(),
         RigidBody::Dynamic,
         Velocity::zero(),
-        Collider::cuboid(2.5, 5., 2.5),
         GravityScale(10.),
-        LockedAxes::ROTATION_LOCKED
+        LockedAxes::ROTATION_LOCKED,
+        InheritedVisibility::default()
     )).with_child((
         Camera3d::default(),
         Transform::from_translation(Vec3::new(0., 2.5, 0.)),
+        // Transform::from_translation(Vec3::new(5., 5., 10.)),
         InheritedVisibility::default(),
         ViewVisibility::default(),
+    )).with_child((
+        PlayerCollider,
+        Collider::cuboid(2.5, 5., 2.5),
+        Transform::default(),
+        CollidingEntities::default()
     ));
 }
 
@@ -171,8 +182,8 @@ fn spawn_map(
         ));
     }
     commands.spawn((
-        Transform::from_translation(Vec3::new(0., 0., 0.)),
-        Mesh3d(meshes.add(Cuboid::new(5000., 1., 5000.))),
+        Transform::from_translation(Vec3::new(0., -0.1, 0.)),
+        Mesh3d(meshes.add(Cuboid::new(5000., 0.2, 5000.))),
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: Color::linear_rgb(1., 0., 0.),
             ..Default::default()
@@ -217,8 +228,8 @@ fn spawn_map(
     ));
     commands.spawn((
         SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
+        Collider::cuboid(50., 100., 50.),
         Transform::from_translation(Vec3::new(50., 0., 50.)).with_scale(Vec3::splat(0.04)),
-        Collider::cuboid(5., 5., 5.)
     ));
 }
 
@@ -541,14 +552,9 @@ fn player_move(
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
-    mut commands: Commands,
-    sounds: Res<SoundEffects>
+    cursor: Single<&CursorOptions, With<PrimaryWindow>>
 ) {
-    if cursor.visible {
-        return;
-    }
-    println!("TGTPABOPUT1");
+    if cursor.visible { return; }
     let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) { 3. } else { 1. };
     let mut delta = Vec3::ZERO;
     let (mut transform, mut player_data, mut velocity, mut gravity) = player.into_inner();
@@ -571,14 +577,6 @@ fn player_move(
     // fly or jump depending on player gamemode
     if player_data.creative && input.pressed(KeyCode::Space) {
         to_move.y += 1.;
-    } else if input.pressed(KeyCode::Space) {
-        velocity.linvel.y = player_data.velocity.y;
-        to_move.y += 1.;
-        commands.spawn((
-            InGameSfx,
-            AudioPlayer::new(sounds.jump.clone()),
-            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.1))
-        ));
     }
     if player_data.creative && (input.pressed(KeyCode::ControlLeft) || mouse_input.pressed(MouseButton::Forward)) && !player_data.sneaking {
         to_move.y -= 1.;
@@ -594,12 +592,6 @@ fn player_move(
         *velocity = Velocity::zero();
     }
     to_move = to_move.normalize_or_zero();
-    // if !player_data.creative {
-    //     if to_move.x > 0. && hitbox.collisions.east { to_move.x = 0.};
-    //     if to_move.x < 0. && hitbox.collisions.west { to_move.x = 0.};
-    //     if to_move.z > 0. && hitbox.collisions.north { to_move.z = 0.};
-    //     if to_move.z < 0. && hitbox.collisions.south { to_move.z = 0.};
-    // }
     if player_data.creative {
         transform.translation += to_move * time.delta_secs() * player_data.speed * speed_multiplier;
     } else {
@@ -607,16 +599,53 @@ fn player_move(
         velocity.linvel.x = futur_move.x;
         velocity.linvel.z = futur_move.z;
     }
+}
+
+fn player_sneak(
+    player: Single<(&mut Player, &mut Velocity), With<Player>>,
+    collider: Single<(Entity, &mut Transform), With<PlayerCollider>>,
+    mut commands: Commands,
+    input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    cursor: Single<&CursorOptions, With<PrimaryWindow>>
+) {
+    if cursor.visible { return; }
+    let (entity, mut transform) = collider.into_inner();
+    let (mut player_data, mut velocity) = player.into_inner();
     if !player_data.creative && (input.just_pressed(KeyCode::ControlLeft) || mouse_input.just_pressed(MouseButton::Forward)) && !player_data.sneaking {
-        transform.translation.y -= 1.;
         player_data.speed *= 0.25;
         player_data.sneaking = true;
+        commands.entity(entity).insert(Collider::cuboid(2.5, 2.5, 2.5));
+        transform.translation.y -= 1.25;
+        // velocity.linvel.y = -20.;
     } else if !player_data.creative && player_data.sneaking && (input.just_released(KeyCode::ControlLeft) || mouse_input.just_released(MouseButton::Forward)) {
-        transform.translation.y += 1.;
         player_data.speed *= 4.;
         player_data.sneaking = false;
+        commands.entity(entity).insert(Collider::cuboid(2.5, 5., 2.5));
+        transform.translation.y = 0.;
+        // velocity.linvel.y = 20.;
     }
 }
+
+fn player_jump(
+    player: Single<(&mut Player, &mut Velocity), With<Player>>,
+    mut commands: Commands,
+    input: Res<ButtonInput<KeyCode>>,
+    sounds: Res<SoundEffects>,
+    cursor: Single<&CursorOptions, With<PrimaryWindow>>
+) {
+    if cursor.visible { return; }
+    let (player_data, mut velocity) = player.into_inner();
+    if !player_data.creative && input.pressed(KeyCode::Space) && velocity.linvel.y == 0. {
+        velocity.linvel.y = player_data.velocity.y;
+        commands.spawn((
+            InGameSfx,
+            AudioPlayer::new(sounds.jump.clone()),
+            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.1))
+        ));
+    }
+}
+
 
 fn spawn_ball(
     mut events: MessageReader<BallSpawn>,
