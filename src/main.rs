@@ -16,8 +16,7 @@ fn main() {
         load_sfx,
         spawn_map,
         spawn_menu,
-        spawn_hud,
-        setup_physics)
+        spawn_hud)
     .chain());
     app.insert_resource(Time::<Fixed>::from_hz(60.));
     app.add_systems(Update, 
@@ -56,12 +55,9 @@ struct Player {
 
 impl Default for Player {
     fn default() -> Self {
-        Player { speed: 50., creative: false, velocity: Vec3::Y * 20., sneaking: false }
+        Player { speed: 50., creative: false, velocity: Vec3::Y * 40., sneaking: false }
     }
 }
-
-#[derive(Component)]
-struct PlayerCollider;
 
 #[derive(Event, Deref)]
 struct GrabEvent(bool);
@@ -149,20 +145,15 @@ fn spawn_camera(mut commands: Commands) {
         Player::default(),
         RigidBody::Dynamic,
         Velocity::zero(),
-        GravityScale(10.),
+        Collider::cuboid(2.5, 5., 2.5),
+        GravityScale(15.),
         LockedAxes::ROTATION_LOCKED,
         InheritedVisibility::default()
     )).with_child((
         Camera3d::default(),
         Transform::from_translation(Vec3::new(0., 2.5, 0.)),
-        // Transform::from_translation(Vec3::new(5., 5., 10.)),
         InheritedVisibility::default(),
         ViewVisibility::default(),
-    )).with_child((
-        PlayerCollider,
-        Collider::cuboid(2.5, 5., 2.5),
-        Transform::default(),
-        CollidingEntities::default()
     ));
 }
 
@@ -226,6 +217,15 @@ fn spawn_map(
             ..Default::default()
         })),
         Collider::cuboid(5., 5., 5.)
+    ));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 25., 70.)),
+        Mesh3d(meshes.add(Cuboid::new(100., 50., 10.))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(0., 1., 1.),
+            ..Default::default()
+        })),
+        Collider::cuboid(50., 25., 5.)
     ));
     commands.spawn((
         SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
@@ -549,16 +549,16 @@ fn toggle_grab(
 }
 
 fn player_move(
-    player: Single<(&mut Transform, &Player, &mut Velocity, &mut GravityScale), With<Player>>,
+    player: Single<(&mut Transform, &Player, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
     cursor: Single<&CursorOptions, With<PrimaryWindow>>
 ) {
     if cursor.visible { return; }
-    let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) { 3. } else { 1. };
+    let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) { 2. } else { 1. };
     let mut delta = Vec3::ZERO;
-    let (mut transform, player_data, mut velocity, mut gravity) = player.into_inner();
+    let (mut transform, player_data, mut velocity) = player.into_inner();
     if input.pressed(KeyCode::KeyA) {
         delta.x -= 1.;
     }
@@ -581,12 +581,6 @@ fn player_move(
     }
     if player_data.creative && (input.pressed(KeyCode::ControlLeft) || mouse_input.pressed(MouseButton::Forward)) && !player_data.sneaking {
         to_move.y -= 1.;
-    }
-
-    if player_data.creative {
-        gravity.0 = 0.;
-    } else {
-        gravity.0 = 10.
     }
     to_move = to_move.normalize_or_zero();
     if player_data.creative {
@@ -616,28 +610,24 @@ fn switch_gamemode(
 }
 
 fn player_sneak(
-    player: Single<(&mut Player, &mut Velocity), With<Player>>,
-    collider: Single<(Entity, &mut Transform), With<PlayerCollider>>,
+    player: Single<(&mut Player, &mut Transform, Entity), With<Player>>,
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     cursor: Single<&CursorOptions, With<PrimaryWindow>>
 ) {
     if cursor.visible { return; }
-    let (entity, mut transform) = collider.into_inner();
-    let (mut player_data, mut velocity) = player.into_inner();
+    let (mut player_data, mut transform, entity) = player.into_inner();
     if !player_data.creative && (input.just_pressed(KeyCode::ControlLeft) || mouse_input.just_pressed(MouseButton::Forward)) && !player_data.sneaking {
         player_data.speed *= 0.25;
         player_data.sneaking = true;
         commands.entity(entity).insert(Collider::cuboid(2.5, 2.5, 2.5));
         transform.translation.y -= 1.25;
-        // velocity.linvel.y = -20.;
     } else if !player_data.creative && player_data.sneaking && (input.just_released(KeyCode::ControlLeft) || mouse_input.just_released(MouseButton::Forward)) {
         player_data.speed *= 4.;
         player_data.sneaking = false;
         commands.entity(entity).insert(Collider::cuboid(2.5, 5., 2.5));
         transform.translation.y = 0.;
-        // velocity.linvel.y = 20.;
     }
 }
 
@@ -682,6 +672,10 @@ fn spawn_ball(
                 coefficient: 0.7,
                 combine_rule: CoefficientCombineRule::Max
             },
+            Damping {
+                linear_damping: 0.25,
+                angular_damping: 0.5
+            },
             GravityScale(50.),
             Ccd::enabled()
         ));
@@ -725,23 +719,4 @@ fn shoot_ball(
         power.charging = true;
         power.current = 1.;
     }
-}
-
-fn setup_physics(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>
-) {
-    /* Create the bouncing ball. */
-    commands
-        .spawn(RigidBody::Dynamic)
-        .insert(Collider::ball(0.5))
-        .insert(Restitution::coefficient(0.7))
-        .insert(Transform::from_xyz(0.0, 50., 0.0))
-        .insert(Mesh3d(meshes.add(Cuboid::new(2.5, 5., 2.5))))
-        .insert(MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 0., 1.),
-            ..Default::default() 
-        })))
-        .insert(LockedAxes::ROTATION_LOCKED);
 }
