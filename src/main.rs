@@ -232,6 +232,10 @@ fn spawn_map(
         Collider::cuboid(50., 100., 50.),
         Transform::from_translation(Vec3::new(50., 0., 50.)).with_scale(Vec3::splat(0.04)),
     ));
+    commands.spawn((
+        SceneRoot(asset_server.load("models/peashooter-gw/scene.gltf#Scene0")),
+        Transform::from_translation(Vec3::new(65., 0., 50.)).with_scale(Vec3::splat(7.)),
+    ));
 }
 
 #[derive(Component)]
