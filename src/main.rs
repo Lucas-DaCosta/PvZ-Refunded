@@ -22,6 +22,7 @@ fn main() {
     app.insert_resource(Time::<Fixed>::from_hz(60.));
     app.add_systems(Update, 
         (player_look,
+            switch_gamemode,
             player_move.after(player_look),
             player_sneak.before(PhysicsSet::SyncBackend),
             player_jump.before(PhysicsSet::SyncBackend),
@@ -548,7 +549,7 @@ fn toggle_grab(
 }
 
 fn player_move(
-    player: Single<(&mut Transform, &mut Player, &mut Velocity, &mut GravityScale), With<Player>>,
+    player: Single<(&mut Transform, &Player, &mut Velocity, &mut GravityScale), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
@@ -557,7 +558,7 @@ fn player_move(
     if cursor.visible { return; }
     let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) { 3. } else { 1. };
     let mut delta = Vec3::ZERO;
-    let (mut transform, mut player_data, mut velocity, mut gravity) = player.into_inner();
+    let (mut transform, player_data, mut velocity, mut gravity) = player.into_inner();
     if input.pressed(KeyCode::KeyA) {
         delta.x -= 1.;
     }
@@ -587,10 +588,6 @@ fn player_move(
     } else {
         gravity.0 = 10.
     }
-    if input.just_pressed(KeyCode::KeyQ) {
-        player_data.creative = !player_data.creative;
-        *velocity = Velocity::zero();
-    }
     to_move = to_move.normalize_or_zero();
     if player_data.creative {
         transform.translation += to_move * time.delta_secs() * player_data.speed * speed_multiplier;
@@ -598,6 +595,23 @@ fn player_move(
         let futur_move = to_move * player_data.speed * speed_multiplier;
         velocity.linvel.x = futur_move.x;
         velocity.linvel.z = futur_move.z;
+    }
+}
+
+fn switch_gamemode(
+    player: Single<(Entity, &mut Player, &mut Velocity), With<Player>>,
+    input: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands
+) {
+    let (entity, mut player_data, mut velocity) = player.into_inner();
+    if input.just_pressed(KeyCode::KeyQ) {
+        player_data.creative = !player_data.creative;
+        *velocity = Velocity::zero();
+        if player_data.creative {
+            commands.entity(entity).insert((RigidBodyDisabled, ColliderDisabled));
+        } else {
+            commands.entity(entity).remove::<(RigidBodyDisabled, ColliderDisabled)>();
+        }
     }
 }
 
@@ -661,13 +675,15 @@ fn spawn_ball(
             Collider::ball(1.),
             RigidBody::Dynamic,
             Velocity {
-                linvel: spawn.velocity * spawn.power * 20.,
+                linvel: spawn.velocity * spawn.power * 5.,
                 angvel: Vec3::ZERO
+            },
+            Restitution {
+                coefficient: 0.7,
+                combine_rule: CoefficientCombineRule::Max
             },
             GravityScale(50.),
             Ccd::enabled()
-            // Velocity(spawn.velocity * spawn.power * 5.),
-            // Hitbox::new(Vec3::ZERO, 2., 2., 2.)
         ));
         commands.spawn((
             InGameSfx,
