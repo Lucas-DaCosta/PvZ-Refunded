@@ -148,6 +148,10 @@ fn spawn_camera(mut commands: Commands) {
         Collider::cuboid(2.5, 5., 2.5),
         GravityScale(15.),
         LockedAxes::ROTATION_LOCKED,
+        Friction {
+            coefficient: 0.,
+            combine_rule: CoefficientCombineRule::Min
+        },
         InheritedVisibility::default()
     )).with_child((
         Camera3d::default(),
@@ -229,12 +233,25 @@ fn spawn_map(
     ));
     commands.spawn((
         SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Collider::cuboid(50., 100., 50.),
-        Transform::from_translation(Vec3::new(50., 0., 50.)).with_scale(Vec3::splat(0.04)),
+        Transform::from_translation(Vec3::new(50., 0., 50.))
+            .with_scale(Vec3::splat(0.04)),
+        AsyncSceneCollider {
+            shape: Some(ComputedColliderShape::ConvexHull),
+            named_shapes: Default::default()
+        },
     ));
     commands.spawn((
         SceneRoot(asset_server.load("models/peashooter-gw/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(65., 0., 50.)).with_scale(Vec3::splat(7.)),
+        Transform::from_translation(Vec3::new(65., 0., 50.))
+            .with_scale(Vec3::splat(7.)),
+        AsyncSceneCollider {
+            shape: Some(ComputedColliderShape::ConvexDecomposition(VHACDParameters {
+                resolution: 32,
+                max_convex_hulls: 4,
+                ..Default::default()
+            })),
+            named_shapes: Default::default()
+        },
     ));
 }
 
