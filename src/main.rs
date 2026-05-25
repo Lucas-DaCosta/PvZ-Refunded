@@ -34,7 +34,8 @@ fn main() {
             update_menu_visibility,
             update_hud_visibility,
             update_menu_sfx,
-            update_in_game_sfx));
+            update_in_game_sfx,
+            rotate_model));
     app.add_observer(apply_grab);
     app.add_message::<BallSpawn>();
     app.init_resource::<BallData>();
@@ -161,6 +162,25 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
+#[derive(Debug)]
+enum RotationAxes {
+    X,
+    Y,
+    Z
+}
+
+#[derive(Component)]
+struct RotateModel {
+    speed: f32,
+    rotation_axes: RotationAxes
+}
+
+impl Default for RotateModel {
+    fn default() -> Self {
+        Self { speed: 10., rotation_axes: RotationAxes::Y }
+    }
+}
+
 fn spawn_map(
     mut commands: Commands,
     ball_data: Res<BallData>,
@@ -232,15 +252,10 @@ fn spawn_map(
         Collider::cuboid(50., 25., 5.)
     ));
     commands.spawn((
-        SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(50., 0., 50.))
-            .with_scale(Vec3::splat(0.04)),
-        AsyncSceneCollider {
-            shape: Some(ComputedColliderShape::ConvexHull),
-            named_shapes: Default::default()
+        RotateModel {
+            speed: -50.,
+            rotation_axes: RotationAxes::Z,
         },
-    ));
-    commands.spawn((
         SceneRoot(asset_server.load("models/peashooter-gw/scene.gltf#Scene0")),
         Transform::from_translation(Vec3::new(65., 0., 50.))
             .with_scale(Vec3::splat(7.)),
@@ -253,6 +268,48 @@ fn spawn_map(
             named_shapes: Default::default()
         },
     ));
+    commands.spawn((
+        RotateModel::default(),
+        SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
+        Transform::from_translation(Vec3::new(80., 0., 50.))
+            .with_scale(Vec3::splat(6.)),
+        AsyncSceneCollider {
+            shape: Some(ComputedColliderShape::ConvexHull),
+            named_shapes: Default::default()
+        },
+    ));
+    commands.spawn((
+        RotateModel {
+            speed: -250.,
+            rotation_axes: RotationAxes::Y
+        },
+        SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
+        Transform::from_translation(Vec3::new(95., 0., 50.))
+            .with_scale(Vec3::splat(6.)),
+        AsyncSceneCollider {
+            shape: Some(ComputedColliderShape::ConvexHull),
+            named_shapes: Default::default()
+        },
+    ));
+}
+
+fn rotate_model(
+    models: Query<(&mut Transform, &RotateModel), With<RotateModel>>,
+    time: Res<Time>
+) {
+    for (mut model, movement) in models {
+        match movement.rotation_axes {
+            RotationAxes::X => {
+                model.rotate(Quat::from_rotation_x(movement.speed.to_radians() * time.delta_secs()))
+            },
+            RotationAxes::Y => {
+                model.rotate(Quat::from_rotation_y(movement.speed.to_radians() * time.delta_secs()))
+            },
+            RotationAxes::Z => {
+                model.rotate(Quat::from_rotation_z(movement.speed.to_radians() * time.delta_secs()))
+            },
+        }
+    }
 }
 
 #[derive(Component)]
