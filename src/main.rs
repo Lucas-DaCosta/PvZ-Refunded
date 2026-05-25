@@ -1,4 +1,4 @@
-use bevy::{audio::Volume, input::{common_conditions::input_just_pressed, mouse::AccumulatedMouseMotion}, prelude::*, window::{CursorOptions, PrimaryWindow, WindowFocused}};
+use bevy::{audio::Volume, input::{common_conditions::input_just_pressed, mouse::AccumulatedMouseMotion}, prelude::*, ui::widget::Text, window::{CursorOptions, PrimaryWindow, WindowFocused}};
 // use bevy_rapier3d::{geometry::{Collider, Restitution}, plugin::{NoUserData, RapierPhysicsPlugin}, rapier::dynamics::RigidBody, render::RapierDebugRenderPlugin};
 use bevy_rapier3d::prelude::*;
 use rand::{SeedableRng, seq::IndexedRandom};
@@ -35,7 +35,11 @@ fn main() {
             update_hud_visibility,
             update_menu_sfx,
             update_in_game_sfx,
-            rotate_model));
+            rotate_model,
+            handle_button,
+            disable_enable_sfx,
+            update_button_audio
+        ));
     app.add_observer(apply_grab);
     app.add_message::<BallSpawn>();
     app.init_resource::<BallData>();
@@ -51,12 +55,13 @@ struct Player {
     speed: f32,
     creative: bool,
     velocity: Vec3,
-    sneaking: bool
+    sneaking: bool,
+    audios: bool,
 }
 
 impl Default for Player {
     fn default() -> Self {
-        Player { speed: 50., creative: false, velocity: Vec3::Y * 40., sneaking: false }
+        Player { speed: 50., creative: false, velocity: Vec3::Y * 40., sneaking: false, audios: true }
     }
 }
 
@@ -327,9 +332,33 @@ struct MenuSfx;
 #[derive(Component)]
 struct InGameSfx;
 
+#[derive(Component, PartialEq)]
+enum GameSettings {
+    Audio
+}
+
+fn handle_button(
+    buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<Button>)>,
+    mut player: Single<&mut Player>
+) {
+    for (interaction, mut bg) in buttons {
+        match interaction {
+            Interaction::Pressed => {
+                player.audios = !player.audios;
+            },
+            Interaction::Hovered => {
+                bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.)
+            },
+            Interaction::None => {
+                bg.0 = Color::linear_rgb(0.2, 0.2, 0.2)
+            }
+        }
+    }
+}
+
 fn spawn_menu(
     mut commands: Commands,
-    sounds: Res<SoundEffects>
+    sounds: Res<SoundEffects>,
 ) {
     commands.spawn((
         MenuUi,
@@ -404,10 +433,74 @@ fn spawn_menu(
         )
     );
     commands.spawn((
+        MenuUi,
+        Node {
+        position_type: PositionType::Absolute,
+        width: Val::Vw(30.),
+        height: Val::Vh(90.),
+        bottom: Val::Vh(5.),
+        left: Val::Vw(68.5),
+        top: Val::Vh(5.),
+        flex_direction: FlexDirection::Column,
+        border_radius: BorderRadius::all(Val::VMax(1.)),
+        ..Default::default()
+        },
+        BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+    )).with_children(|parent| {
+        parent.spawn((
+            Text::new("Settings :"),
+            Node {
+                margin: UiRect::all(Val::Percent(5.)),
+                ..Default::default()
+            },
+            TextFont {
+                font_size: 30.,
+                ..Default::default()
+            },
+            TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.))
+        ));
+        parent.spawn((
+            Button,
+            Node {
+                width: Val::Percent(90.),
+                height: Val::Percent(10.),
+                margin: UiRect::all(Val::Percent(5.)),
+                border: UiRect::vertical(Val::Px(2.)),
+                align_items: AlignItems::Center,
+                ..Default::default()
+            },
+            TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
+            BorderColor::all(Color::linear_rgba(1., 1., 1., 1.)),
+        )).with_child((
+            GameSettings::Audio,
+            Text::new("Audio : Enabled"),
+            TextFont {
+                font_size: 20.,
+                ..Default::default()
+            },
+            Node {
+                margin: UiRect::all(Val::Percent(2.5)),
+                ..Default::default()
+            },
+        ));
+    });
+    commands.spawn((
         MenuSfx,
         AudioPlayer::new(sounds.main_theme.clone()),
         PlaybackSettings::LOOP.with_volume(Volume::Linear(0.2))
     ));
+}
+
+fn update_button_audio (
+    player: Single<&Player>,
+    settings: Query<(&GameSettings, &mut Text)>
+) {
+    for (setting, mut text) in settings {
+        if *setting == GameSettings::Audio {
+            let audio = if player.audios {"Enabled"} else {"Disabled"};
+            text.0 = format!("Audio : {audio}");
+        }
+    }
 }
 
 fn spawn_hud(
@@ -501,6 +594,19 @@ fn update_menu_visibility(
             *vis = Visibility::Visible;
         } else {
             *vis = Visibility::Hidden;
+        }
+    }
+}
+
+fn disable_enable_sfx(
+    audios: Query<&mut AudioSink>,
+    player: Single<&Player>
+) {
+    for mut audio in audios {
+        if player.audios {
+            audio.unmute();
+        } else {
+            audio.mute();
         }
     }
 }
