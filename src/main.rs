@@ -1,4 +1,10 @@
-use bevy::{audio::Volume, input::{common_conditions::input_just_pressed, mouse::AccumulatedMouseMotion}, prelude::*, ui::widget::Text, window::{CursorOptions, PrimaryWindow, WindowFocused}};
+use bevy::{
+    audio::Volume,
+    input::{common_conditions::input_just_pressed, mouse::AccumulatedMouseMotion},
+    prelude::*,
+    ui::widget::Text,
+    window::{CursorOptions, PrimaryWindow, WindowFocused},
+};
 // use bevy_rapier3d::{geometry::{Collider, Restitution}, plugin::{NoUserData, RapierPhysicsPlugin}, rapier::dynamics::RigidBody, render::RapierDebugRenderPlugin};
 use bevy_rapier3d::prelude::*;
 use rand::{SeedableRng, seq::IndexedRandom};
@@ -10,17 +16,20 @@ fn round_to(value: f32, decimal_places: i32) -> f32 {
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins((DefaultPlugins, RapierPhysicsPlugin::<NoUserData>::default(), RapierDebugRenderPlugin::default()));
-    app.add_systems(Startup, (
-        spawn_camera,
-        load_sfx,
-        spawn_map,
-        spawn_menu,
-        spawn_hud)
-    .chain());
+    app.add_plugins((
+        DefaultPlugins,
+        RapierPhysicsPlugin::<NoUserData>::default(),
+        RapierDebugRenderPlugin::default(),
+    ));
+    app.add_systems(
+        Startup,
+        (spawn_camera, load_sfx, spawn_map, spawn_menu, spawn_hud).chain(),
+    );
     app.insert_resource(Time::<Fixed>::from_hz(60.));
-    app.add_systems(Update, 
-        (player_look,
+    app.add_systems(
+        Update,
+        (
+            player_look,
             switch_gamemode,
             player_move.after(player_look),
             player_sneak.before(PhysicsSet::SyncBackend),
@@ -38,14 +47,15 @@ fn main() {
             rotate_model,
             handle_button,
             disable_enable_sfx,
-            update_button_audio
-        ));
+            update_button_audio,
+        ),
+    );
     app.add_observer(apply_grab);
     app.add_message::<BallSpawn>();
     app.init_resource::<BallData>();
     app.insert_resource(Power {
         charging: false,
-        current: 0.
+        current: 0.,
     });
     app.run();
 }
@@ -61,7 +71,13 @@ struct Player {
 
 impl Default for Player {
     fn default() -> Self {
-        Player { speed: 50., creative: false, velocity: Vec3::Y * 40., sneaking: false, audios: true }
+        Player {
+            speed: 50.,
+            creative: false,
+            velocity: Vec3::Y * 40.,
+            sneaking: false,
+            audios: true,
+        }
     }
 }
 
@@ -72,14 +88,14 @@ struct GrabEvent(bool);
 struct BallSpawn {
     position: Vec3,
     velocity: Vec3,
-    power: f32
+    power: f32,
 }
 
 #[derive(Resource)]
 struct BallData {
     mesh: Handle<Mesh>,
     materials: Vec<Handle<StandardMaterial>>,
-    rng: std::sync::Mutex<rand::rngs::StdRng>
+    rng: std::sync::Mutex<rand::rngs::StdRng>,
 }
 
 impl BallData {
@@ -105,20 +121,24 @@ impl FromWorld for BallData {
             }));
         }
         let seed = *b"tunicIsBetterThanYouHEHEHEHAPTDR";
-        BallData { mesh, materials, rng: std::sync::Mutex::new(rand::rngs::StdRng::from_seed(seed)) }
+        BallData {
+            mesh,
+            materials,
+            rng: std::sync::Mutex::new(rand::rngs::StdRng::from_seed(seed)),
+        }
     }
 }
 
 #[derive(Resource)]
 struct Power {
     charging: bool,
-    current: f32
+    current: f32,
 }
 
 #[derive(Component)]
 struct PowerBar {
     min: f32,
-    max: f32
+    max: f32,
 }
 
 const NOT_CHARGING: Color = Color::linear_rgb(0.2, 0.2, 0.2);
@@ -130,59 +150,61 @@ struct SoundEffects {
     jump: Handle<AudioSource>,
     shotgun: Handle<AudioSource>,
     main_theme: Handle<AudioSource>,
-    in_game_theme: Handle<AudioSource>
+    in_game_theme: Handle<AudioSource>,
 }
 
-fn load_sfx(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>
-) {
+fn load_sfx(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(SoundEffects {
         jump: asset_server.load("audios/mario-jump.mp3"),
         shotgun: asset_server.load("audios/spas12.mp3"),
         main_theme: asset_server.load("audios/dexter-blood-theme.mp3"),
-        in_game_theme: asset_server.load("audios/portal-radio.mp3")
+        in_game_theme: asset_server.load("audios/portal-radio.mp3"),
     });
 }
 
 fn spawn_camera(mut commands: Commands) {
-    commands.spawn((
-        Transform::from_translation(Vec3::new(0., 50., 0.)),
-        Player::default(),
-        RigidBody::Dynamic,
-        Velocity::zero(),
-        Collider::cuboid(2.5, 5., 2.5),
-        GravityScale(15.),
-        LockedAxes::ROTATION_LOCKED,
-        Friction {
-            coefficient: 0.,
-            combine_rule: CoefficientCombineRule::Min
-        },
-        InheritedVisibility::default()
-    )).with_child((
-        Camera3d::default(),
-        Transform::from_translation(Vec3::new(0., 2.5, 0.)),
-        InheritedVisibility::default(),
-        ViewVisibility::default(),
-    ));
+    commands
+        .spawn((
+            Transform::from_translation(Vec3::new(0., 50., 0.)),
+            Player::default(),
+            RigidBody::Dynamic,
+            Velocity::zero(),
+            Collider::cuboid(2.5, 5., 2.5),
+            GravityScale(15.),
+            LockedAxes::ROTATION_LOCKED,
+            Friction {
+                coefficient: 0.,
+                combine_rule: CoefficientCombineRule::Min,
+            },
+            InheritedVisibility::default(),
+        ))
+        .with_child((
+            Camera3d::default(),
+            Transform::from_translation(Vec3::new(0., 2.5, 0.)),
+            InheritedVisibility::default(),
+            ViewVisibility::default(),
+        ));
 }
 
 #[derive(Debug)]
 enum RotationAxes {
     X,
     Y,
-    Z
+    Z,
 }
 
 #[derive(Component)]
 struct RotateModel {
     speed: f32,
-    rotation_axes: RotationAxes
+    rotation_axes: RotationAxes,
 }
 
 impl Default for RotateModel {
     fn default() -> Self {
-        Self { speed: 10., rotation_axes: RotationAxes::Y }
+        Self {
+            speed: 10.,
+            rotation_axes: RotationAxes::Y,
+        }
     }
 }
 
@@ -191,7 +213,7 @@ fn spawn_map(
     ball_data: Res<BallData>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>
+    asset_server: Res<AssetServer>,
 ) {
     commands.spawn(DirectionalLight::default());
     for h in 0..ball_data.materials.len() {
@@ -199,7 +221,7 @@ fn spawn_map(
             Transform::from_translation(Vec3::new((-8. + h as f32) * 2., 5., -30.)),
             Mesh3d(ball_data.mesh()),
             MeshMaterial3d(ball_data.materials[h].clone()),
-            Collider::ball(1.)
+            Collider::ball(1.),
         ));
     }
     commands.spawn((
@@ -209,7 +231,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(1., 0., 0.),
             ..Default::default()
         })),
-        Collider::cuboid(2500., 0.1, 2500.)
+        Collider::cuboid(2500., 0.1, 2500.),
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(30., 10., 0.)),
@@ -218,7 +240,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 0.),
             ..Default::default()
         })),
-        Collider::cuboid(5., 50., 5.)
+        Collider::cuboid(5., 50., 5.),
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(-30., 11., 0.)),
@@ -227,7 +249,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Collider::cuboid(5., 5., 5.)
+        Collider::cuboid(5., 5., 5.),
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(-30., 20., -20.)),
@@ -236,7 +258,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Collider::cuboid(5., 5., 5.)
+        Collider::cuboid(5., 5., 5.),
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(-30., 9.5, 20.)),
@@ -245,7 +267,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Collider::cuboid(5., 5., 5.)
+        Collider::cuboid(5., 5., 5.),
     ));
     commands.spawn((
         Transform::from_translation(Vec3::new(0., 25., 70.)),
@@ -254,7 +276,7 @@ fn spawn_map(
             base_color: Color::linear_rgb(0., 1., 1.),
             ..Default::default()
         })),
-        Collider::cuboid(50., 25., 5.)
+        Collider::cuboid(50., 25., 5.),
     ));
     commands.spawn((
         RotateModel {
@@ -262,57 +284,53 @@ fn spawn_map(
             rotation_axes: RotationAxes::Z,
         },
         SceneRoot(asset_server.load("models/peashooter-gw/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(65., 0., 50.))
-            .with_scale(Vec3::splat(7.)),
+        Transform::from_translation(Vec3::new(65., 0., 50.)).with_scale(Vec3::splat(7.)),
         AsyncSceneCollider {
-            shape: Some(ComputedColliderShape::ConvexDecomposition(VHACDParameters {
-                resolution: 32,
-                max_convex_hulls: 4,
-                ..Default::default()
-            })),
-            named_shapes: Default::default()
+            shape: Some(ComputedColliderShape::ConvexDecomposition(
+                VHACDParameters {
+                    resolution: 32,
+                    max_convex_hulls: 4,
+                    ..Default::default()
+                },
+            )),
+            named_shapes: Default::default(),
         },
     ));
     commands.spawn((
         RotateModel::default(),
         SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(80., 0., 50.))
-            .with_scale(Vec3::splat(6.)),
+        Transform::from_translation(Vec3::new(80., 0., 50.)).with_scale(Vec3::splat(6.)),
         AsyncSceneCollider {
             shape: Some(ComputedColliderShape::ConvexHull),
-            named_shapes: Default::default()
+            named_shapes: Default::default(),
         },
     ));
     commands.spawn((
         RotateModel {
             speed: -250.,
-            rotation_axes: RotationAxes::Y
+            rotation_axes: RotationAxes::Y,
         },
         SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(95., 0., 50.))
-            .with_scale(Vec3::splat(6.)),
+        Transform::from_translation(Vec3::new(95., 0., 50.)).with_scale(Vec3::splat(6.)),
         AsyncSceneCollider {
             shape: Some(ComputedColliderShape::ConvexHull),
-            named_shapes: Default::default()
+            named_shapes: Default::default(),
         },
     ));
 }
 
-fn rotate_model(
-    models: Query<(&mut Transform, &RotateModel), With<RotateModel>>,
-    time: Res<Time>
-) {
+fn rotate_model(models: Query<(&mut Transform, &RotateModel), With<RotateModel>>, time: Res<Time>) {
     for (mut model, movement) in models {
         match movement.rotation_axes {
-            RotationAxes::X => {
-                model.rotate(Quat::from_rotation_x(movement.speed.to_radians() * time.delta_secs()))
-            },
-            RotationAxes::Y => {
-                model.rotate(Quat::from_rotation_y(movement.speed.to_radians() * time.delta_secs()))
-            },
-            RotationAxes::Z => {
-                model.rotate(Quat::from_rotation_z(movement.speed.to_radians() * time.delta_secs()))
-            },
+            RotationAxes::X => model.rotate(Quat::from_rotation_x(
+                movement.speed.to_radians() * time.delta_secs(),
+            )),
+            RotationAxes::Y => model.rotate(Quat::from_rotation_y(
+                movement.speed.to_radians() * time.delta_secs(),
+            )),
+            RotationAxes::Z => model.rotate(Quat::from_rotation_z(
+                movement.speed.to_radians() * time.delta_secs(),
+            )),
         }
     }
 }
@@ -334,170 +352,169 @@ struct InGameSfx;
 
 #[derive(Component, PartialEq)]
 enum GameSettings {
-    Audio
+    Audio,
 }
 
 fn handle_button(
     buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<Button>)>,
-    mut player: Single<&mut Player>
+    mut player: Single<&mut Player>,
 ) {
     for (interaction, mut bg) in buttons {
         match interaction {
             Interaction::Pressed => {
                 player.audios = !player.audios;
-            },
-            Interaction::Hovered => {
-                bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.)
-            },
-            Interaction::None => {
-                bg.0 = Color::linear_rgb(0.2, 0.2, 0.2)
             }
+            Interaction::Hovered => bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.),
+            Interaction::None => bg.0 = Color::linear_rgb(0.2, 0.2, 0.2),
         }
     }
 }
 
-fn spawn_menu(
-    mut commands: Commands,
-    sounds: Res<SoundEffects>,
-) {
-    commands.spawn((
-        MenuUi,
-        Node {
-        position_type: PositionType::Absolute,
-        width: Val::Vw(30.),
-        height: Val::Vh(90.),
-        bottom: Val::Vh(5.),
-        left: Val::Vw(1.5),
-        top: Val::Vh(5.),
-        flex_direction: FlexDirection::Column,
-        border_radius: BorderRadius::all(Val::VMax(1.)),
-        ..Default::default()
-        },
-        BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
-    )).with_children(|parent| {
-        parent.spawn((
-            Text::new("Controls :"),
+fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
+    commands
+        .spawn((
+            MenuUi,
             Node {
-                margin: UiRect::all(Val::Percent(5.)),
+                position_type: PositionType::Absolute,
+                width: Val::Vw(30.),
+                height: Val::Vh(90.),
+                bottom: Val::Vh(5.),
+                left: Val::Vw(1.5),
+                top: Val::Vh(5.),
+                flex_direction: FlexDirection::Column,
+                border_radius: BorderRadius::all(Val::VMax(1.)),
                 ..Default::default()
             },
-            TextFont {
-                font_size: 30.,
-                ..Default::default()
-            },
-            TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.))
-        ));
-        parent.spawn((
-            Text::new("- ZQSD/WASD to move\n\
+            BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Controls :"),
+                Node {
+                    margin: UiRect::all(Val::Percent(5.)),
+                    ..Default::default()
+                },
+                TextFont {
+                    font_size: 30.,
+                    ..Default::default()
+                },
+                TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
+            ));
+            parent.spawn((
+                Text::new(
+                    "- ZQSD/WASD to move\n\
                             - SPACE to jump\n\
                             - LEFT CTRL or Mouse4 to sneak\n\
                             - SHIFT to sprint\n\
                             - LEFT CLICK to throw ball\n\
                             - A to switch between creative/survival mode\n\
-                            - ESHAP to show/unshow this menu"),
+                            - ESHAP to show/unshow this menu",
+                ),
+                Node {
+                    margin: UiRect::all(Val::Percent(5.)),
+                    ..Default::default()
+                },
+                TextFont {
+                    font_size: 25.,
+                    ..Default::default()
+                },
+                TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
+            ));
+        });
+    commands
+        .spawn((
+            MenuUi,
             Node {
-                margin: UiRect::all(Val::Percent(5.)),
+                position_type: PositionType::Absolute,
+                width: Val::Vw(15.),
+                height: Val::Vh(5.),
+                bottom: Val::Vh(47.5),
+                left: Val::Vw(42.5),
+                flex_direction: FlexDirection::Column,
+                border_radius: BorderRadius::all(Val::VMax(1.)),
                 ..Default::default()
             },
-            TextFont {
-                font_size: 25.,
-                ..Default::default()
-            },
-            TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.))
-        ));
-    });
-    commands.spawn((
-        MenuUi,
-        Node {
-        position_type: PositionType::Absolute,
-        width: Val::Vw(15.),
-        height: Val::Vh(5.),
-        bottom: Val::Vh(47.5),
-        left: Val::Vw(42.5),
-        flex_direction: FlexDirection::Column,
-        border_radius: BorderRadius::all(Val::VMax(1.)),
-        ..Default::default()
-        },
-        BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
-    )).with_child((
-        Text::new("PAUSE"),
-        Node {
-            margin: UiRect::all(Val::Auto),
-            ..Default::default()
-        },
-        TextFont {
-            font_size: 30.,
-            ..Default::default()
-        },
-        TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.))
-        )
-    );
-    commands.spawn((
-        MenuUi,
-        Node {
-        position_type: PositionType::Absolute,
-        width: Val::Vw(30.),
-        height: Val::Vh(90.),
-        bottom: Val::Vh(5.),
-        left: Val::Vw(68.5),
-        top: Val::Vh(5.),
-        flex_direction: FlexDirection::Column,
-        border_radius: BorderRadius::all(Val::VMax(1.)),
-        ..Default::default()
-        },
-        BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
-    )).with_children(|parent| {
-        parent.spawn((
-            Text::new("Settings :"),
+            BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+        ))
+        .with_child((
+            Text::new("PAUSE"),
             Node {
-                margin: UiRect::all(Val::Percent(5.)),
+                margin: UiRect::all(Val::Auto),
                 ..Default::default()
             },
             TextFont {
                 font_size: 30.,
                 ..Default::default()
             },
-            TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.))
-        ));
-        parent.spawn((
-            Button,
-            Node {
-                width: Val::Percent(90.),
-                height: Val::Percent(10.),
-                margin: UiRect::all(Val::Percent(5.)),
-                border: UiRect::vertical(Val::Px(2.)),
-                align_items: AlignItems::Center,
-                ..Default::default()
-            },
             TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
-            BorderColor::all(Color::linear_rgba(1., 1., 1., 1.)),
-        )).with_child((
-            GameSettings::Audio,
-            Text::new("Audio : Enabled"),
-            TextFont {
-                font_size: 20.,
-                ..Default::default()
-            },
-            Node {
-                margin: UiRect::all(Val::Percent(2.5)),
-                ..Default::default()
-            },
         ));
-    });
+    commands
+        .spawn((
+            MenuUi,
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Vw(30.),
+                height: Val::Vh(90.),
+                bottom: Val::Vh(5.),
+                left: Val::Vw(68.5),
+                top: Val::Vh(5.),
+                flex_direction: FlexDirection::Column,
+                border_radius: BorderRadius::all(Val::VMax(1.)),
+                ..Default::default()
+            },
+            BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Settings :"),
+                Node {
+                    margin: UiRect::all(Val::Percent(5.)),
+                    ..Default::default()
+                },
+                TextFont {
+                    font_size: 30.,
+                    ..Default::default()
+                },
+                TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
+            ));
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Percent(90.),
+                        height: Val::Percent(10.),
+                        margin: UiRect::all(Val::Percent(5.)),
+                        border: UiRect::vertical(Val::Px(2.)),
+                        align_items: AlignItems::Center,
+                        ..Default::default()
+                    },
+                    TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
+                    BorderColor::all(Color::linear_rgba(1., 1., 1., 1.)),
+                ))
+                .with_child((
+                    GameSettings::Audio,
+                    Text::new("Audio : Enabled"),
+                    TextFont {
+                        font_size: 20.,
+                        ..Default::default()
+                    },
+                    Node {
+                        margin: UiRect::all(Val::Percent(2.5)),
+                        ..Default::default()
+                    },
+                ));
+        });
     commands.spawn((
         MenuSfx,
         AudioPlayer::new(sounds.main_theme.clone()),
-        PlaybackSettings::LOOP.with_volume(Volume::Linear(0.2))
+        PlaybackSettings::LOOP.with_volume(Volume::Linear(0.2)),
     ));
 }
 
-fn update_button_audio (
-    player: Single<&Player>,
-    settings: Query<(&GameSettings, &mut Text)>
-) {
+fn update_button_audio(player: Single<&Player>, settings: Query<(&GameSettings, &mut Text)>) {
     for (setting, mut text) in settings {
         if *setting == GameSettings::Audio {
-            let audio = if player.audios {"Enabled"} else {"Disabled"};
+            let audio = if player.audios { "Enabled" } else { "Disabled" };
             text.0 = format!("Audio : {audio}");
         }
     }
@@ -506,39 +523,46 @@ fn update_button_audio (
 fn spawn_hud(
     mut commands: Commands,
     player: Single<&mut Transform, With<Player>>,
-    sounds: Res<SoundEffects>
+    sounds: Res<SoundEffects>,
 ) {
     let pos = player.translation;
-    commands.spawn((
-        PlayerHud,
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Vw(12.5),
-            height: Val::Vh(2.5),
-            bottom: Val::Vh(5.),
-            left: Val::Vw(86.),
-            border_radius: BorderRadius::all(Val::VMax(1.)),
-            ..Default::default()
-        },
-        BackgroundColor(Color::linear_rgb(0.5, 0.5, 0.5)),
-    )).with_child((
-        Node {
-            position_type: PositionType::Absolute,
-            min_width: Val::Vw(MIN_FILL),
-            height: Val::Percent(100.),
-            border_radius: BorderRadius::all(Val::VMax(1.)),
-            ..Default::default()
-        },
-        BackgroundColor(NOT_CHARGING),
-        PowerBar { min: 1., max: 2.}
-    ));
+    commands
+        .spawn((
+            PlayerHud,
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Vw(12.5),
+                height: Val::Vh(2.5),
+                bottom: Val::Vh(5.),
+                left: Val::Vw(86.),
+                border_radius: BorderRadius::all(Val::VMax(1.)),
+                ..Default::default()
+            },
+            BackgroundColor(Color::linear_rgb(0.5, 0.5, 0.5)),
+        ))
+        .with_child((
+            Node {
+                position_type: PositionType::Absolute,
+                min_width: Val::Vw(MIN_FILL),
+                height: Val::Percent(100.),
+                border_radius: BorderRadius::all(Val::VMax(1.)),
+                ..Default::default()
+            },
+            BackgroundColor(NOT_CHARGING),
+            PowerBar { min: 1., max: 2. },
+        ));
     commands.spawn((
         PlayerHud,
         CoordsHud,
-        Text::new(format!("X: {}\nY: {}\nZ: {}", round_to(pos.x, 2), round_to(pos.y, 2), round_to(pos.z, 2))),
+        Text::new(format!(
+            "X: {}\nY: {}\nZ: {}",
+            round_to(pos.x, 2),
+            round_to(pos.y, 2),
+            round_to(pos.z, 2)
+        )),
         TextFont {
-                font_size: 15.,
-                ..Default::default()
+            font_size: 15.,
+            ..Default::default()
         },
         TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
         Node {
@@ -546,48 +570,50 @@ fn spawn_hud(
             bottom: Val::Vh(90.),
             left: Val::Vw(1.),
             ..Default::default()
-        }
+        },
     ));
-    commands.spawn((
-        PlayerHud,
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.),
-            height: Val::Percent(100.),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..Default::default()
-        }
-    )).with_children(|parent| {
-        parent.spawn((
+    commands
+        .spawn((
+            PlayerHud,
             Node {
                 position_type: PositionType::Absolute,
-                width: Val::VMax(1.),
-                height: Val::VMax(0.15),
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
                 ..Default::default()
             },
-            BackgroundColor(Color::linear_rgba(1., 1., 1., 1.))
-        ));
-        parent.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::VMax(0.15),
-                height: Val::VMax(1.),
-                ..Default::default()
-            },
-            BackgroundColor(Color::linear_rgba(1., 1., 1., 1.))
-        ));
-    });
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::VMax(1.),
+                    height: Val::VMax(0.15),
+                    ..Default::default()
+                },
+                BackgroundColor(Color::linear_rgba(1., 1., 1., 1.)),
+            ));
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::VMax(0.15),
+                    height: Val::VMax(1.),
+                    ..Default::default()
+                },
+                BackgroundColor(Color::linear_rgba(1., 1., 1., 1.)),
+            ));
+        });
     commands.spawn((
         InGameSfx,
         AudioPlayer::new(sounds.in_game_theme.clone()),
-        PlaybackSettings::LOOP.with_volume(Volume::Linear(0.2))
+        PlaybackSettings::LOOP.with_volume(Volume::Linear(0.2)),
     ));
 }
 
 fn update_menu_visibility(
     cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    visibility: Query<&mut Visibility, With<MenuUi>>
+    visibility: Query<&mut Visibility, With<MenuUi>>,
 ) {
     for mut vis in visibility {
         if cursor.visible {
@@ -598,10 +624,7 @@ fn update_menu_visibility(
     }
 }
 
-fn disable_enable_sfx(
-    audios: Query<&mut AudioSink>,
-    player: Single<&Player>
-) {
+fn disable_enable_sfx(audios: Query<&mut AudioSink>, player: Single<&Player>) {
     for mut audio in audios {
         if player.audios {
             audio.unmute();
@@ -628,7 +651,7 @@ fn update_menu_sfx(
 
 fn update_in_game_sfx(
     cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    audios: Query<&AudioSink, With<InGameSfx>>
+    audios: Query<&AudioSink, With<InGameSfx>>,
 ) {
     for audio in audios {
         if cursor.visible {
@@ -641,7 +664,7 @@ fn update_in_game_sfx(
 
 fn update_hud_visibility(
     cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    visibility: Query<&mut Visibility, With<PlayerHud>>
+    visibility: Query<&mut Visibility, With<PlayerHud>>,
 ) {
     for mut vis in visibility {
         if !cursor.visible {
@@ -654,17 +677,22 @@ fn update_hud_visibility(
 
 fn update_player_coords(
     mut coords: Query<&mut Text, With<CoordsHud>>,
-    player: Single<&mut Transform, With<Player>>
+    player: Single<&mut Transform, With<Player>>,
 ) {
     let pos = player.translation;
     for mut text in &mut coords {
-        text.0 = format!("X: {}\nY: {}\nZ: {}", round_to(pos.x, 2), round_to(pos.y, 2), round_to(pos.z, 2));
+        text.0 = format!(
+            "X: {}\nY: {}\nZ: {}",
+            round_to(pos.x, 2),
+            round_to(pos.y, 2),
+            round_to(pos.z, 2)
+        );
     }
 }
 
 fn update_power_bar(
     mut bars: Query<(&mut Node, &PowerBar, &mut BackgroundColor)>,
-    power: Res<Power>
+    power: Res<Power>,
 ) {
     for (mut bar, config, mut bg) in &mut bars {
         if !power.charging {
@@ -684,9 +712,11 @@ fn player_look(
     mut camera: Single<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mouse_motion: Res<AccumulatedMouseMotion>,
     time: Res<Time>,
-    window: Single<&Window, With<PrimaryWindow>>
+    window: Single<&Window, With<PrimaryWindow>>,
 ) {
-    if !window.focused { return; }
+    if !window.focused {
+        return;
+    }
     let dt = time.delta_secs();
     let sensitivity = 100. / window.width().min(window.height());
 
@@ -701,10 +731,7 @@ fn player_look(
     camera.rotation = Quat::from_rotation_x(new_pitch);
 }
 
-fn apply_grab(
-    grab: On<GrabEvent>,
-    mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>
-) {
+fn apply_grab(grab: On<GrabEvent>, mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>) {
     use bevy::window::CursorGrabMode;
     if **grab {
         cursor.visible = false;
@@ -715,19 +742,13 @@ fn apply_grab(
     }
 }
 
-fn focus_event(
-    mut events: MessageReader<WindowFocused>,
-    mut commands: Commands
-) {
+fn focus_event(mut events: MessageReader<WindowFocused>, mut commands: Commands) {
     if let Some(event) = events.read().last() {
         commands.trigger(GrabEvent(event.focused));
     }
 }
 
-fn toggle_grab(
-    mut window: Single<&mut Window, With<PrimaryWindow>>,
-    mut commands: Commands
-) {
+fn toggle_grab(mut window: Single<&mut Window, With<PrimaryWindow>>, mut commands: Commands) {
     window.focused = !window.focused;
     commands.trigger(GrabEvent(window.focused));
 }
@@ -737,10 +758,16 @@ fn player_move(
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>
+    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
 ) {
-    if cursor.visible { return; }
-    let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) { 2. } else { 1. };
+    if cursor.visible {
+        return;
+    }
+    let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) {
+        2.
+    } else {
+        1.
+    };
     let mut delta = Vec3::ZERO;
     let (mut transform, player_data, mut velocity) = player.into_inner();
     if input.pressed(KeyCode::KeyA) {
@@ -763,7 +790,10 @@ fn player_move(
     if player_data.creative && input.pressed(KeyCode::Space) {
         to_move.y += 1.;
     }
-    if player_data.creative && (input.pressed(KeyCode::ControlLeft) || mouse_input.pressed(MouseButton::Forward)) && !player_data.sneaking {
+    if player_data.creative
+        && (input.pressed(KeyCode::ControlLeft) || mouse_input.pressed(MouseButton::Forward))
+        && !player_data.sneaking
+    {
         to_move.y -= 1.;
     }
     to_move = to_move.normalize_or_zero();
@@ -779,16 +809,20 @@ fn player_move(
 fn switch_gamemode(
     player: Single<(Entity, &mut Player, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
-    mut commands: Commands
+    mut commands: Commands,
 ) {
     let (entity, mut player_data, mut velocity) = player.into_inner();
     if input.just_pressed(KeyCode::KeyQ) {
         player_data.creative = !player_data.creative;
         *velocity = Velocity::zero();
         if player_data.creative {
-            commands.entity(entity).insert((RigidBodyDisabled, ColliderDisabled));
+            commands
+                .entity(entity)
+                .insert((RigidBodyDisabled, ColliderDisabled));
         } else {
-            commands.entity(entity).remove::<(RigidBodyDisabled, ColliderDisabled)>();
+            commands
+                .entity(entity)
+                .remove::<(RigidBodyDisabled, ColliderDisabled)>();
         }
     }
 }
@@ -798,19 +832,33 @@ fn player_sneak(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>
+    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
 ) {
-    if cursor.visible { return; }
+    if cursor.visible {
+        return;
+    }
     let (mut player_data, mut transform, entity) = player.into_inner();
-    if !player_data.creative && (input.just_pressed(KeyCode::ControlLeft) || mouse_input.just_pressed(MouseButton::Forward)) && !player_data.sneaking {
+    if !player_data.creative
+        && (input.just_pressed(KeyCode::ControlLeft)
+            || mouse_input.just_pressed(MouseButton::Forward))
+        && !player_data.sneaking
+    {
         player_data.speed *= 0.25;
         player_data.sneaking = true;
-        commands.entity(entity).insert(Collider::cuboid(2.5, 2.5, 2.5));
+        commands
+            .entity(entity)
+            .insert(Collider::cuboid(2.5, 2.5, 2.5));
         transform.translation.y -= 1.25;
-    } else if !player_data.creative && player_data.sneaking && (input.just_released(KeyCode::ControlLeft) || mouse_input.just_released(MouseButton::Forward)) {
+    } else if !player_data.creative
+        && player_data.sneaking
+        && (input.just_released(KeyCode::ControlLeft)
+            || mouse_input.just_released(MouseButton::Forward))
+    {
         player_data.speed *= 4.;
         player_data.sneaking = false;
-        commands.entity(entity).insert(Collider::cuboid(2.5, 5., 2.5));
+        commands
+            .entity(entity)
+            .insert(Collider::cuboid(2.5, 5., 2.5));
         transform.translation.y = 0.;
     }
 }
@@ -820,26 +868,27 @@ fn player_jump(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     sounds: Res<SoundEffects>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>
+    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
 ) {
-    if cursor.visible { return; }
+    if cursor.visible {
+        return;
+    }
     let (player_data, mut velocity) = player.into_inner();
     if !player_data.creative && input.pressed(KeyCode::Space) && velocity.linvel.y == 0. {
         velocity.linvel.y = player_data.velocity.y;
         commands.spawn((
             InGameSfx,
             AudioPlayer::new(sounds.jump.clone()),
-            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.1))
+            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.1)),
         ));
     }
 }
-
 
 fn spawn_ball(
     mut events: MessageReader<BallSpawn>,
     mut commands: Commands,
     ball_data: Res<BallData>,
-    sounds: Res<SoundEffects>
+    sounds: Res<SoundEffects>,
 ) {
     for spawn in events.read() {
         commands.spawn((
@@ -850,26 +899,25 @@ fn spawn_ball(
             RigidBody::Dynamic,
             Velocity {
                 linvel: spawn.velocity * spawn.power * 5.,
-                angvel: Vec3::ZERO
+                angvel: Vec3::ZERO,
             },
             Restitution {
                 coefficient: 0.7,
-                combine_rule: CoefficientCombineRule::Max
+                combine_rule: CoefficientCombineRule::Max,
             },
             Damping {
                 linear_damping: 0.25,
-                angular_damping: 0.5
+                angular_damping: 0.5,
             },
             GravityScale(50.),
-            Ccd::enabled()
+            Ccd::enabled(),
         ));
         commands.spawn((
             InGameSfx,
             AudioPlayer::new(sounds.shotgun.clone()),
-            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.05))
+            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.05)),
         ));
     }
-
 }
 
 fn shoot_ball(
@@ -879,7 +927,7 @@ fn shoot_ball(
     mut spawner: MessageWriter<BallSpawn>,
     cursor: Single<&CursorOptions, With<PrimaryWindow>>,
     mut power: ResMut<Power>,
-    time: Res<Time>
+    time: Res<Time>,
 ) {
     if cursor.visible {
         return;
@@ -889,7 +937,7 @@ fn shoot_ball(
             spawner.write(BallSpawn {
                 position: player.transform_point(player_cam.translation),
                 velocity: player.rotation * player_cam.forward().as_vec3() * 2.5,
-                power: (power.current * 2.).exp()
+                power: (power.current * 2.).exp(),
             });
         }
         if mouse_inputs.pressed(MouseButton::Left) {
