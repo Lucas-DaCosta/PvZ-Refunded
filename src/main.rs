@@ -6,7 +6,7 @@ use bevy::{
     window::{CursorOptions, PrimaryWindow, WindowFocused},
 };
 
-use bevy_rapier3d::{parry::shape::Compound, prelude::*};
+use bevy_rapier3d::prelude::*;
 use rand::{SeedableRng, seq::IndexedRandom};
 
 fn round_to(value: f32, decimal_places: i32) -> f32 {
@@ -48,6 +48,7 @@ fn main() {
             handle_button,
             disable_enable_sfx,
             update_button_audio,
+            toggle_pause_game,
         )
             .chain(),
     );
@@ -943,5 +944,27 @@ fn shoot_ball(
     if mouse_inputs.just_pressed(MouseButton::Left) {
         power.charging = true;
         power.current = 1.;
+    }
+}
+
+// fn toggle_physics(
+//     mut config: Single<&mut RapierConfiguration>,
+//     cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
+// ) {
+//     if cursor.visible {
+//         config.physics_pipeline_active = false;
+//     } else {
+//         config.physics_pipeline_active = true;
+//     }
+// }
+
+fn toggle_pause_game(
+    mut time: ResMut<Time<Virtual>>,
+    cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
+) {
+    if cursor.visible {
+        time.pause();
+    } else {
+        time.unpause();
     }
 }
