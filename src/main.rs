@@ -5,8 +5,8 @@ use bevy::{
     ui::widget::Text,
     window::{CursorOptions, PrimaryWindow, WindowFocused},
 };
-// use bevy_rapier3d::{geometry::{Collider, Restitution}, plugin::{NoUserData, RapierPhysicsPlugin}, rapier::dynamics::RigidBody, render::RapierDebugRenderPlugin};
-use bevy_rapier3d::prelude::*;
+
+use bevy_rapier3d::{parry::shape::Compound, prelude::*};
 use rand::{SeedableRng, seq::IndexedRandom};
 
 fn round_to(value: f32, decimal_places: i32) -> f32 {
@@ -31,13 +31,13 @@ fn main() {
         (
             player_look,
             switch_gamemode,
-            player_move.after(player_look),
+            player_move,
             player_sneak.before(PhysicsSet::SyncBackend),
             player_jump.before(PhysicsSet::SyncBackend),
             focus_event,
             toggle_grab.run_if(input_just_pressed(KeyCode::Escape)),
             spawn_ball,
-            shoot_ball.before(spawn_ball).before(focus_event),
+            shoot_ball,
             update_power_bar,
             update_player_coords,
             update_menu_visibility,
@@ -48,7 +48,8 @@ fn main() {
             handle_button,
             disable_enable_sfx,
             update_button_audio,
-        ),
+        )
+            .chain(),
     );
     app.add_observer(apply_grab);
     app.add_message::<BallSpawn>();
@@ -186,25 +187,12 @@ fn spawn_camera(mut commands: Commands) {
         ));
 }
 
-#[derive(Debug)]
-enum RotationAxes {
-    X,
-    Y,
-    Z,
-}
-
 #[derive(Component)]
-struct RotateModel {
-    speed: f32,
-    rotation_axes: RotationAxes,
-}
+struct RotateModel(Vec3);
 
 impl Default for RotateModel {
     fn default() -> Self {
-        Self {
-            speed: 10.,
-            rotation_axes: RotationAxes::Y,
-        }
+        Self(Vec3::new(0., 1., 0.))
     }
 }
 
@@ -279,10 +267,7 @@ fn spawn_map(
         Collider::cuboid(50., 25., 5.),
     ));
     commands.spawn((
-        RotateModel {
-            speed: -50.,
-            rotation_axes: RotationAxes::Z,
-        },
+        RotateModel(Vec3::NEG_Z * 2.5),
         SceneRoot(asset_server.load("models/peashooter-gw/scene.gltf#Scene0")),
         Transform::from_translation(Vec3::new(65., 0., 50.)).with_scale(Vec3::splat(7.)),
         AsyncSceneCollider {
@@ -306,32 +291,41 @@ fn spawn_map(
         },
     ));
     commands.spawn((
-        RotateModel {
-            speed: -250.,
-            rotation_axes: RotationAxes::Y,
-        },
-        SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(95., 0., 50.)).with_scale(Vec3::splat(6.)),
-        AsyncSceneCollider {
-            shape: Some(ComputedColliderShape::ConvexHull),
-            named_shapes: Default::default(),
-        },
+        RotateModel(Vec3::NEG_Y * 10.),
+        Transform::from_translation(Vec3::new(95., 5., 50.)),
+        Mesh3d(meshes.add(Capsule3d::new(2.5, 5.))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(0., 0., 1.),
+            ..Default::default()
+        })),
+        Collider::capsule_y(2.5, 2.5),
+    ));
+    commands.spawn((
+        RotateModel(Vec3::new(-0.25, -0.25, 0.)),
+        Transform::from_translation(Vec3::new(110., 5., 50.)),
+        Mesh3d(meshes.add(Capsule3d::new(2.5, 5.))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(0., 1., 1.),
+            ..Default::default()
+        })),
+        Collider::capsule_y(2.5, 2.5),
+    ));
+    commands.spawn((
+        RotateModel(Vec3::new(-0.5, 1., 2.)),
+        Transform::from_translation(Vec3::new(135., 5., 50.)),
+        Mesh3d(meshes.add(Capsule3d::new(2.5, 5.))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(1., 0., 1.),
+            ..Default::default()
+        })),
+        Collider::capsule_y(2.5, 2.5),
     ));
 }
 
 fn rotate_model(models: Query<(&mut Transform, &RotateModel), With<RotateModel>>, time: Res<Time>) {
     for (mut model, movement) in models {
-        match movement.rotation_axes {
-            RotationAxes::X => model.rotate(Quat::from_rotation_x(
-                movement.speed.to_radians() * time.delta_secs(),
-            )),
-            RotationAxes::Y => model.rotate(Quat::from_rotation_y(
-                movement.speed.to_radians() * time.delta_secs(),
-            )),
-            RotationAxes::Z => model.rotate(Quat::from_rotation_z(
-                movement.speed.to_radians() * time.delta_secs(),
-            )),
-        }
+        let speed = movement.0.length() * time.delta_secs();
+        model.rotate(Quat::from_axis_angle(movement.0.normalize(), speed));
     }
 }
 
@@ -365,7 +359,7 @@ fn handle_button(
                 player.audios = !player.audios;
             }
             Interaction::Hovered => bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.),
-            Interaction::None => bg.0 = Color::linear_rgb(0.2, 0.2, 0.2),
+            Interaction::None => bg.0 = Color::linear_rgba(0., 0., 0., 0.),
         }
     }
 }
@@ -643,7 +637,6 @@ fn update_menu_sfx(
         if !cursor.visible {
             audio.pause();
         } else {
-            // Retire le AudioSink → Bevy le recrée et relance depuis le début
             commands.entity(entity).remove::<AudioSink>();
         }
     }
