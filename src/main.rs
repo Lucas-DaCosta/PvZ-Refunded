@@ -1,18 +1,20 @@
 use bevy::{
-    audio::Volume,
     input::{common_conditions::input_just_pressed, mouse::AccumulatedMouseMotion},
     prelude::*,
     ui::widget::Text,
     window::{CursorOptions, PrimaryWindow, WindowFocused},
 };
-
 use bevy_rapier3d::prelude::*;
 
 mod balls;
 mod hud;
+mod map;
+mod pause_menu;
 mod player;
 use crate::balls::*;
 use crate::hud::*;
+use crate::map::*;
+use crate::pause_menu::*;
 use crate::player::*;
 
 fn round_to(value: f32, decimal_places: i32) -> f32 {
@@ -136,151 +138,6 @@ fn spawn_camera(mut commands: Commands) {
 }
 
 #[derive(Component)]
-struct RotateModel(Vec3);
-
-impl Default for RotateModel {
-    fn default() -> Self {
-        Self(Vec3::new(0., 1., 0.))
-    }
-}
-
-fn spawn_map(
-    mut commands: Commands,
-    ball_data: Res<BallData>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>,
-) {
-    commands.spawn(DirectionalLight::default());
-    for h in 0..ball_data.materials.len() {
-        commands.spawn((
-            Transform::from_translation(Vec3::new((-8. + h as f32) * 2., 5., -30.)),
-            Mesh3d(ball_data.mesh()),
-            MeshMaterial3d(ball_data.materials[h].clone()),
-            Collider::ball(1.),
-        ));
-    }
-    commands.spawn((
-        Transform::from_translation(Vec3::new(0., -0.1, 0.)),
-        Mesh3d(meshes.add(Cuboid::new(5000., 0.2, 5000.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(1., 0., 0.),
-            ..Default::default()
-        })),
-        Collider::cuboid(2500., 0.1, 2500.),
-    ));
-    commands.spawn((
-        Transform::from_translation(Vec3::new(30., 10., 0.)),
-        Mesh3d(meshes.add(Cuboid::new(10., 100., 10.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 1., 0.),
-            ..Default::default()
-        })),
-        Collider::cuboid(5., 50., 5.),
-    ));
-    commands.spawn((
-        Transform::from_translation(Vec3::new(-30., 11., 0.)),
-        Mesh3d(meshes.add(Cuboid::new(10., 10., 10.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 1., 1.),
-            ..Default::default()
-        })),
-        Collider::cuboid(5., 5., 5.),
-    ));
-    commands.spawn((
-        Transform::from_translation(Vec3::new(-30., 20., -20.)),
-        Mesh3d(meshes.add(Cuboid::new(10., 10., 10.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 1., 1.),
-            ..Default::default()
-        })),
-        Collider::cuboid(5., 5., 5.),
-    ));
-    commands.spawn((
-        Transform::from_translation(Vec3::new(-30., 9.5, 20.)),
-        Mesh3d(meshes.add(Cuboid::new(10., 10., 10.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 1., 1.),
-            ..Default::default()
-        })),
-        Collider::cuboid(5., 5., 5.),
-    ));
-    commands.spawn((
-        Transform::from_translation(Vec3::new(0., 25., 70.)),
-        Mesh3d(meshes.add(Cuboid::new(100., 50., 10.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 1., 1.),
-            ..Default::default()
-        })),
-        Collider::cuboid(50., 25., 5.),
-    ));
-    commands.spawn((
-        RotateModel(Vec3::NEG_Z * 2.5),
-        SceneRoot(asset_server.load("models/peashooter-gw/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(65., 0., 50.)).with_scale(Vec3::splat(7.)),
-        AsyncSceneCollider {
-            shape: Some(ComputedColliderShape::ConvexDecomposition(
-                VHACDParameters {
-                    resolution: 32,
-                    max_convex_hulls: 4,
-                    ..Default::default()
-                },
-            )),
-            named_shapes: Default::default(),
-        },
-    ));
-    commands.spawn((
-        RotateModel::default(),
-        SceneRoot(asset_server.load("models/amogus/scene.gltf#Scene0")),
-        Transform::from_translation(Vec3::new(80., 0., 50.)).with_scale(Vec3::splat(6.)),
-        AsyncSceneCollider {
-            shape: Some(ComputedColliderShape::ConvexHull),
-            named_shapes: Default::default(),
-        },
-    ));
-    commands.spawn((
-        RotateModel(Vec3::NEG_Y * 10.),
-        Transform::from_translation(Vec3::new(95., 5., 50.)),
-        Mesh3d(meshes.add(Capsule3d::new(2.5, 5.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 0., 1.),
-            ..Default::default()
-        })),
-        Collider::capsule_y(2.5, 2.5),
-    ));
-    commands.spawn((
-        RotateModel(Vec3::new(-0.25, -0.25, 0.)),
-        Transform::from_translation(Vec3::new(110., 5., 50.)),
-        Mesh3d(meshes.add(Capsule3d::new(2.5, 5.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(0., 1., 1.),
-            ..Default::default()
-        })),
-        Collider::capsule_y(2.5, 2.5),
-    ));
-    commands.spawn((
-        RotateModel(Vec3::new(-0.5, 1., 2.)),
-        Transform::from_translation(Vec3::new(135., 5., 50.)),
-        Mesh3d(meshes.add(Capsule3d::new(2.5, 5.))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(1., 0., 1.),
-            ..Default::default()
-        })),
-        Collider::capsule_y(2.5, 2.5),
-    ));
-}
-
-fn rotate_model(models: Query<(&mut Transform, &RotateModel), With<RotateModel>>, time: Res<Time>) {
-    for (mut model, movement) in models {
-        let speed = movement.0.length() * time.delta_secs();
-        model.rotate(Quat::from_axis_angle(movement.0.normalize(), speed));
-    }
-}
-
-#[derive(Component)]
-struct MenuUi;
-
-#[derive(Component)]
 struct MenuSfx;
 
 #[derive(Component)]
@@ -306,170 +163,12 @@ fn handle_button(
     }
 }
 
-fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
-    commands
-        .spawn((
-            MenuUi,
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Vw(30.),
-                height: Val::Vh(90.),
-                bottom: Val::Vh(5.),
-                left: Val::Vw(1.5),
-                top: Val::Vh(5.),
-                flex_direction: FlexDirection::Column,
-                border_radius: BorderRadius::all(Val::VMax(1.)),
-                ..Default::default()
-            },
-            BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
-            Visibility::Hidden,
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                Text::new("Controls :"),
-                Node {
-                    margin: UiRect::all(Val::Percent(5.)),
-                    ..Default::default()
-                },
-                TextFont {
-                    font_size: 30.,
-                    ..Default::default()
-                },
-                TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
-            ));
-            parent.spawn((
-                Text::new(
-                    "- ZQSD/WASD to move\n\
-                            - SPACE to jump\n\
-                            - LEFT CTRL or Mouse4 to sneak\n\
-                            - SHIFT to sprint\n\
-                            - LEFT CLICK to throw ball\n\
-                            - A to switch between creative/survival mode\n\
-                            - ESHAP to show/unshow this menu",
-                ),
-                Node {
-                    margin: UiRect::all(Val::Percent(5.)),
-                    ..Default::default()
-                },
-                TextFont {
-                    font_size: 25.,
-                    ..Default::default()
-                },
-                TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
-            ));
-        });
-    commands
-        .spawn((
-            MenuUi,
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Vw(15.),
-                height: Val::Vh(5.),
-                bottom: Val::Vh(47.5),
-                left: Val::Vw(42.5),
-                flex_direction: FlexDirection::Column,
-                border_radius: BorderRadius::all(Val::VMax(1.)),
-                ..Default::default()
-            },
-            BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
-            Visibility::Hidden,
-        ))
-        .with_child((
-            Text::new("PAUSE"),
-            Node {
-                margin: UiRect::all(Val::Auto),
-                ..Default::default()
-            },
-            TextFont {
-                font_size: 30.,
-                ..Default::default()
-            },
-            TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
-        ));
-    commands
-        .spawn((
-            MenuUi,
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Vw(30.),
-                height: Val::Vh(90.),
-                bottom: Val::Vh(5.),
-                left: Val::Vw(68.5),
-                top: Val::Vh(5.),
-                flex_direction: FlexDirection::Column,
-                border_radius: BorderRadius::all(Val::VMax(1.)),
-                ..Default::default()
-            },
-            BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
-            Visibility::Hidden,
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                Text::new("Settings :"),
-                Node {
-                    margin: UiRect::all(Val::Percent(5.)),
-                    ..Default::default()
-                },
-                TextFont {
-                    font_size: 30.,
-                    ..Default::default()
-                },
-                TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
-            ));
-            parent
-                .spawn((
-                    Button,
-                    Node {
-                        width: Val::Percent(90.),
-                        height: Val::Percent(10.),
-                        margin: UiRect::all(Val::Percent(5.)),
-                        border: UiRect::vertical(Val::Px(2.)),
-                        align_items: AlignItems::Center,
-                        ..Default::default()
-                    },
-                    TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
-                    BorderColor::all(Color::linear_rgba(1., 1., 1., 1.)),
-                ))
-                .with_child((
-                    GameSettings::Audio,
-                    Text::new("Audio : Enabled"),
-                    TextFont {
-                        font_size: 20.,
-                        ..Default::default()
-                    },
-                    Node {
-                        margin: UiRect::all(Val::Percent(2.5)),
-                        ..Default::default()
-                    },
-                ));
-        });
-    commands.spawn((
-        MenuSfx,
-        AudioPlayer::new(sounds.main_theme.clone()),
-        PlaybackSettings::LOOP
-            .with_volume(Volume::Linear(0.2))
-            .paused(),
-    ));
-}
-
 fn update_button_audio(player: Single<&Player>, settings: Query<(&GameSettings, &mut Text)>) {
     for (setting, mut text) in settings {
         if *setting == GameSettings::Audio {
             let audio = if player.audios { "Enabled" } else { "Disabled" };
             text.0 = format!("Audio : {audio}");
         }
-    }
-}
-
-fn enable_menu_visibility(visibility: Query<&mut Visibility, With<MenuUi>>) {
-    for mut vis in visibility {
-        *vis = Visibility::Visible;
-    }
-}
-
-fn disable_menu_visibility(visibility: Query<&mut Visibility, With<MenuUi>>) {
-    for mut vis in visibility {
-        *vis = Visibility::Hidden;
     }
 }
 

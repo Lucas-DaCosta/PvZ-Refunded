@@ -1,6 +1,5 @@
-use bevy::{audio::Volume, prelude::*, ui::widget::Text};
-
 use crate::{InGameSfx, SoundEffects, balls::Power, player::Player, round_to};
+use bevy::{audio::Volume, prelude::*, ui::widget::Text};
 
 #[derive(Component)]
 pub struct PowerBar {

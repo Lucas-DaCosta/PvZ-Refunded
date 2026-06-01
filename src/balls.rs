@@ -1,9 +1,7 @@
+use crate::{InGameSfx, Player, SoundEffects};
 use bevy::{audio::Volume, prelude::*};
-
 use bevy_rapier3d::prelude::*;
 use rand::{SeedableRng, seq::IndexedRandom};
-
-use crate::{InGameSfx, Player, SoundEffects};
 
 #[derive(Message)]
 pub struct BallSpawn {

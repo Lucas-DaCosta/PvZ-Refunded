@@ -1,8 +1,6 @@
-use bevy::{audio::Volume, prelude::*};
-
-use bevy_rapier3d::prelude::*;
-
 use crate::{InGameSfx, SoundEffects};
+use bevy::{audio::Volume, prelude::*};
+use bevy_rapier3d::prelude::*;
 
 #[derive(Component)]
 pub struct Player {
