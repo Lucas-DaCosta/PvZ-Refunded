@@ -14,6 +14,14 @@ fn round_to(value: f32, decimal_places: i32) -> f32 {
     (value * factor).round() / factor
 }
 
+#[derive(States, Debug, Clone, Hash, PartialEq, Eq, Default)]
+enum GameState {
+    MainMenu,
+    #[default]
+    Playing,
+    Paused,
+}
+
 fn main() {
     let mut app = App::new();
     app.add_plugins((
@@ -21,9 +29,26 @@ fn main() {
         RapierPhysicsPlugin::<NoUserData>::default(),
         RapierDebugRenderPlugin::default(),
     ));
+    app.init_state::<GameState>();
     app.add_systems(
         Startup,
         (spawn_camera, load_sfx, spawn_map, spawn_menu, spawn_hud).chain(),
+    );
+    app.add_systems(
+        OnEnter(GameState::Playing),
+        (enable_hud_visibility, enable_in_game_sfx),
+    );
+    app.add_systems(
+        OnExit(GameState::Playing),
+        (disable_hud_visibility, disable_in_game_sfx),
+    );
+    app.add_systems(
+        OnEnter(GameState::Paused),
+        (enable_menu_visibility, enable_menu_sfx, pause_game),
+    );
+    app.add_systems(
+        OnExit(GameState::Paused),
+        (disable_menu_visibility, disable_menu_sfx, unpause_game),
     );
     app.insert_resource(Time::<Fixed>::from_hz(60.));
     app.add_systems(
@@ -31,24 +56,23 @@ fn main() {
         (
             player_look,
             switch_gamemode,
-            player_move,
-            player_sneak.before(PhysicsSet::SyncBackend),
-            player_jump.before(PhysicsSet::SyncBackend),
+            player_move.run_if(in_state(GameState::Playing)),
+            player_sneak
+                .before(PhysicsSet::SyncBackend)
+                .run_if(in_state(GameState::Playing)),
+            player_jump
+                .before(PhysicsSet::SyncBackend)
+                .run_if(in_state(GameState::Playing)),
             focus_event,
             toggle_grab.run_if(input_just_pressed(KeyCode::Escape)),
             spawn_ball,
-            shoot_ball,
+            shoot_ball.run_if(in_state(GameState::Playing)),
             update_power_bar,
             update_player_coords,
-            update_menu_visibility,
-            update_hud_visibility,
-            update_menu_sfx,
-            update_in_game_sfx,
             rotate_model,
             handle_button,
             disable_enable_sfx,
             update_button_audio,
-            toggle_pause_game,
         )
             .chain(),
     );
@@ -381,6 +405,7 @@ fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
                 ..Default::default()
             },
             BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+            Visibility::Hidden,
         ))
         .with_children(|parent| {
             parent.spawn((
@@ -430,6 +455,7 @@ fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
                 ..Default::default()
             },
             BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+            Visibility::Hidden,
         ))
         .with_child((
             Text::new("PAUSE"),
@@ -458,6 +484,7 @@ fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
                 ..Default::default()
             },
             BackgroundColor(Color::linear_rgba(0., 0., 0., 0.67)),
+            Visibility::Hidden,
         ))
         .with_children(|parent| {
             parent.spawn((
@@ -502,7 +529,9 @@ fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
     commands.spawn((
         MenuSfx,
         AudioPlayer::new(sounds.main_theme.clone()),
-        PlaybackSettings::LOOP.with_volume(Volume::Linear(0.2)),
+        PlaybackSettings::LOOP
+            .with_volume(Volume::Linear(0.2))
+            .paused(),
     ));
 }
 
@@ -606,16 +635,15 @@ fn spawn_hud(
     ));
 }
 
-fn update_menu_visibility(
-    cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    visibility: Query<&mut Visibility, With<MenuUi>>,
-) {
+fn enable_menu_visibility(visibility: Query<&mut Visibility, With<MenuUi>>) {
     for mut vis in visibility {
-        if cursor.visible {
-            *vis = Visibility::Visible;
-        } else {
-            *vis = Visibility::Hidden;
-        }
+        *vis = Visibility::Visible;
+    }
+}
+
+fn disable_menu_visibility(visibility: Query<&mut Visibility, With<MenuUi>>) {
+    for mut vis in visibility {
+        *vis = Visibility::Hidden;
     }
 }
 
@@ -629,43 +657,39 @@ fn disable_enable_sfx(audios: Query<&mut AudioSink>, player: Single<&Player>) {
     }
 }
 
-fn update_menu_sfx(
-    cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    audios: Query<(Entity, &AudioSink), With<MenuSfx>>,
-    mut commands: Commands,
-) {
-    for (entity, audio) in &audios {
-        if !cursor.visible {
-            audio.pause();
-        } else {
-            commands.entity(entity).remove::<AudioSink>();
-        }
+fn disable_menu_sfx(audios: Query<&AudioSink, With<MenuSfx>>) {
+    for audio in &audios {
+        audio.pause();
     }
 }
 
-fn update_in_game_sfx(
-    cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    audios: Query<&AudioSink, With<InGameSfx>>,
-) {
+fn enable_menu_sfx(audios: Query<&AudioSink, With<MenuSfx>>) {
+    for audio in &audios {
+        audio.play();
+    }
+}
+
+fn disable_in_game_sfx(audios: Query<&AudioSink, With<InGameSfx>>) {
     for audio in audios {
-        if cursor.visible {
-            audio.pause();
-        } else {
-            audio.play();
-        }
+        audio.pause();
     }
 }
 
-fn update_hud_visibility(
-    cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-    visibility: Query<&mut Visibility, With<PlayerHud>>,
-) {
+fn enable_in_game_sfx(audios: Query<&AudioSink, With<InGameSfx>>) {
+    for audio in audios {
+        audio.play();
+    }
+}
+
+fn enable_hud_visibility(visibility: Query<&mut Visibility, With<PlayerHud>>) {
     for mut vis in visibility {
-        if !cursor.visible {
-            *vis = Visibility::Visible;
-        } else {
-            *vis = Visibility::Hidden;
-        }
+        *vis = Visibility::Visible;
+    }
+}
+
+fn disable_hud_visibility(visibility: Query<&mut Visibility, With<PlayerHud>>) {
+    for mut vis in visibility {
+        *vis = Visibility::Hidden;
     }
 }
 
@@ -742,9 +766,19 @@ fn focus_event(mut events: MessageReader<WindowFocused>, mut commands: Commands)
     }
 }
 
-fn toggle_grab(mut window: Single<&mut Window, With<PrimaryWindow>>, mut commands: Commands) {
+fn toggle_grab(
+    mut window: Single<&mut Window, With<PrimaryWindow>>,
+    mut commands: Commands,
+    current_state: Res<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
     window.focused = !window.focused;
     commands.trigger(GrabEvent(window.focused));
+    match current_state.get() {
+        GameState::Playing => next_state.set(GameState::Paused),
+        GameState::Paused => next_state.set(GameState::Playing),
+        _ => {}
+    }
 }
 
 fn player_move(
@@ -752,11 +786,7 @@ fn player_move(
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
 ) {
-    if cursor.visible {
-        return;
-    }
     let speed_multiplier = if input.pressed(KeyCode::ShiftLeft) {
         2.
     } else {
@@ -826,11 +856,7 @@ fn player_sneak(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
 ) {
-    if cursor.visible {
-        return;
-    }
     let (mut player_data, mut transform, entity) = player.into_inner();
     if !player_data.creative
         && (input.just_pressed(KeyCode::ControlLeft)
@@ -862,11 +888,7 @@ fn player_jump(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     sounds: Res<SoundEffects>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
 ) {
-    if cursor.visible {
-        return;
-    }
     let (player_data, mut velocity) = player.into_inner();
     if !player_data.creative && input.pressed(KeyCode::Space) && velocity.linvel.y == 0. {
         velocity.linvel.y = player_data.velocity.y;
@@ -919,13 +941,9 @@ fn shoot_ball(
     player: Single<&mut Transform, (With<Player>, Without<Camera3d>)>,
     player_cam: Single<&mut Transform, (With<Camera3d>, Without<Player>)>,
     mut spawner: MessageWriter<BallSpawn>,
-    cursor: Single<&CursorOptions, With<PrimaryWindow>>,
     mut power: ResMut<Power>,
     time: Res<Time>,
 ) {
-    if cursor.visible {
-        return;
-    }
     if power.charging {
         if mouse_inputs.just_released(MouseButton::Left) {
             spawner.write(BallSpawn {
@@ -958,13 +976,10 @@ fn shoot_ball(
 //     }
 // }
 
-fn toggle_pause_game(
-    mut time: ResMut<Time<Virtual>>,
-    cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-) {
-    if cursor.visible {
-        time.pause();
-    } else {
-        time.unpause();
-    }
+fn pause_game(mut time: ResMut<Time<Virtual>>) {
+    time.pause();
+}
+
+fn unpause_game(mut time: ResMut<Time<Virtual>>) {
+    time.unpause();
 }
