@@ -1,30 +1,26 @@
-use bevy::{
-    input::common_conditions::input_just_pressed,
-    prelude::*,
-    ui::widget::Text,
-    window::{CursorOptions, PrimaryWindow, WindowFocused},
-};
+use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use bevy_rapier3d::prelude::*;
 
 mod audios;
 mod balls;
+mod buttons;
 mod camera;
+mod grab;
 mod hud;
 mod map;
 mod pause_menu;
 mod player;
+mod settings;
 use crate::audios::*;
 use crate::balls::*;
+use crate::buttons::*;
 use crate::camera::*;
+use crate::grab::*;
 use crate::hud::*;
 use crate::map::*;
 use crate::pause_menu::*;
 use crate::player::*;
-
-fn round_to(value: f32, decimal_places: i32) -> f32 {
-    let factor: f32 = 10.0_f32.powi(decimal_places);
-    (value * factor).round() / factor
-}
+use crate::settings::*;
 
 #[derive(States, Debug, Clone, Hash, PartialEq, Eq, Default)]
 enum GameState {
@@ -96,101 +92,6 @@ fn main() {
     });
     app.run();
 }
-
-#[derive(Event, Deref)]
-struct GrabEvent(bool);
-
-#[derive(Component, PartialEq)]
-enum GameSettings {
-    Audio,
-}
-
-fn handle_button(
-    buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<Button>)>,
-    mut player: Single<&mut Player>,
-) {
-    for (interaction, mut bg) in buttons {
-        match interaction {
-            Interaction::Pressed => {
-                player.audios = !player.audios;
-            }
-            Interaction::Hovered => bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.),
-            Interaction::None => bg.0 = Color::linear_rgba(0., 0., 0., 0.),
-        }
-    }
-}
-
-fn update_button_audio(player: Single<&Player>, settings: Query<(&GameSettings, &mut Text)>) {
-    for (setting, mut text) in settings {
-        if *setting == GameSettings::Audio {
-            let audio = if player.audios { "Enabled" } else { "Disabled" };
-            text.0 = format!("Audio : {audio}");
-        }
-    }
-}
-
-fn apply_grab(grab: On<GrabEvent>, mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>) {
-    use bevy::window::CursorGrabMode;
-    if **grab {
-        cursor.visible = false;
-        cursor.grab_mode = CursorGrabMode::Locked;
-    } else {
-        cursor.visible = true;
-        cursor.grab_mode = CursorGrabMode::None;
-    }
-}
-
-fn focus_event(mut events: MessageReader<WindowFocused>, mut commands: Commands) {
-    if let Some(event) = events.read().last() {
-        commands.trigger(GrabEvent(event.focused));
-    }
-}
-
-fn toggle_grab(
-    mut window: Single<&mut Window, With<PrimaryWindow>>,
-    mut commands: Commands,
-    current_state: Res<State<GameState>>,
-    mut next_state: ResMut<NextState<GameState>>,
-) {
-    window.focused = !window.focused;
-    commands.trigger(GrabEvent(window.focused));
-    match current_state.get() {
-        GameState::Playing => next_state.set(GameState::Paused),
-        GameState::Paused => next_state.set(GameState::Playing),
-    }
-}
-
-fn switch_gamemode(
-    player: Single<(Entity, &mut Player, &mut Velocity), With<Player>>,
-    input: Res<ButtonInput<KeyCode>>,
-    mut commands: Commands,
-) {
-    let (entity, mut player_data, mut velocity) = player.into_inner();
-    if input.just_pressed(KeyCode::KeyQ) {
-        player_data.creative = !player_data.creative;
-        *velocity = Velocity::zero();
-        if player_data.creative {
-            commands
-                .entity(entity)
-                .insert((RigidBodyDisabled, ColliderDisabled));
-        } else {
-            commands
-                .entity(entity)
-                .remove::<(RigidBodyDisabled, ColliderDisabled)>();
-        }
-    }
-}
-
-// fn toggle_physics(
-//     mut config: Single<&mut RapierConfiguration>,
-//     cursor: Single<&CursorOptions, (With<PrimaryWindow>, Changed<CursorOptions>)>,
-// ) {
-//     if cursor.visible {
-//         config.physics_pipeline_active = false;
-//     } else {
-//         config.physics_pipeline_active = true;
-//     }
-// }
 
 fn pause_game(mut time: ResMut<Time<Virtual>>) {
     time.pause();

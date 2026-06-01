@@ -1,10 +1,15 @@
-use crate::{InGameSfx, SoundEffects, balls::Power, player::Player, round_to};
+use crate::{InGameSfx, SoundEffects, balls::Power, player::Player};
 use bevy::{audio::Volume, prelude::*, ui::widget::Text};
 
 #[derive(Component)]
 pub struct PowerBar {
     pub min: f32,
     pub max: f32,
+}
+
+pub fn round_to(value: f32, decimal_places: i32) -> f32 {
+    let factor: f32 = 10.0_f32.powi(decimal_places);
+    (value * factor).round() / factor
 }
 
 pub const NOT_CHARGING: Color = Color::linear_rgb(0.2, 0.2, 0.2);

@@ -120,3 +120,24 @@ pub fn player_jump(
         ));
     }
 }
+
+pub fn switch_gamemode(
+    player: Single<(Entity, &mut Player, &mut Velocity), With<Player>>,
+    input: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+) {
+    let (entity, mut player_data, mut velocity) = player.into_inner();
+    if input.just_pressed(KeyCode::KeyQ) {
+        player_data.creative = !player_data.creative;
+        *velocity = Velocity::zero();
+        if player_data.creative {
+            commands
+                .entity(entity)
+                .insert((RigidBodyDisabled, ColliderDisabled));
+        } else {
+            commands
+                .entity(entity)
+                .remove::<(RigidBodyDisabled, ColliderDisabled)>();
+        }
+    }
+}
