@@ -17,12 +17,15 @@ pub fn handle_button(
 ) {
     for (interaction, mut bg, action) in buttons {
         match interaction {
-            Interaction::Pressed => match action {
-                ButtonAction::ToggleAudio => settings.enable_audio = !settings.enable_audio,
-                QuitGame => {
-                    app_exit.write(AppExit::Success);
-                }
-            },
+            Interaction::Pressed => {
+                match action {
+                    ButtonAction::ToggleAudio => settings.enable_audio = !settings.enable_audio,
+                    QuitGame => {
+                        app_exit.write(AppExit::Success);
+                    }
+                };
+                settings.ser_to_file("saves/settings.json".to_owned());
+            }
             Interaction::Hovered => bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.),
             Interaction::None => bg.0 = Color::linear_rgba(0., 0., 0., 0.),
         }

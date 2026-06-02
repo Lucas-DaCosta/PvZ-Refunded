@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Resource, serde::Deserialize)]
+#[derive(Resource, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub struct GameSettings {
     pub enable_audio: bool,
 }
@@ -33,5 +33,18 @@ impl GameSettings {
             }
         };
         Ok(deserialized)
+    }
+    pub fn ser_to_file(self, file_name: String) {
+        let file = match std::fs::File::create(file_name) {
+            Ok(file) => file,
+            Err(err) => {
+                eprintln!("failed opening/creating the file {err}");
+                return;
+            }
+        };
+        match serde_json::ser::to_writer_pretty(&file, &self) {
+            Ok(_) => println!("ser to file success"),
+            Err(err) => eprintln!("ser failed {}", err),
+        }
     }
 }
