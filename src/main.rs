@@ -20,7 +20,7 @@ use crate::hud::*;
 use crate::map::*;
 use crate::pause_menu::*;
 use crate::player::*;
-use crate::settings::*;
+use crate::settings::GameSettings;
 
 #[derive(States, Debug, Clone, Hash, PartialEq, Eq, Default)]
 enum GameState {
@@ -79,13 +79,14 @@ fn main() {
             rotate_model,
             handle_button,
             disable_enable_sfx,
-            update_button_audio,
+            update_button,
         )
             .chain(),
     );
     app.add_observer(apply_grab);
     app.add_message::<BallSpawn>();
     app.init_resource::<BallData>();
+    app.insert_resource(GameSettings::default());
     app.insert_resource(Power {
         charging: false,
         current: 0.,

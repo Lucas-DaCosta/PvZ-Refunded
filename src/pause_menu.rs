@@ -1,4 +1,4 @@
-use crate::{GameSettings, MenuSfx, SoundEffects};
+use crate::{MenuSfx, SoundEffects, buttons::ButtonAction};
 use bevy::{audio::Volume, prelude::*, ui::widget::Text};
 
 #[derive(Component)]
@@ -117,6 +117,7 @@ pub fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
             parent
                 .spawn((
                     Button,
+                    ButtonAction::ToggleAudio,
                     Node {
                         width: Val::Percent(90.),
                         height: Val::Percent(10.),
@@ -125,11 +126,9 @@ pub fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
-                    TextColor(Color::linear_rgba(0.75, 0.75, 0.75, 1.)),
                     BorderColor::all(Color::linear_rgba(1., 1., 1., 1.)),
                 ))
                 .with_child((
-                    GameSettings::Audio,
                     Text::new("Audio : Enabled"),
                     TextFont {
                         font_size: 20.,

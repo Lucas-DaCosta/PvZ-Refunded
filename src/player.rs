@@ -11,7 +11,6 @@ pub struct Player {
     pub creative: bool,
     pub velocity: Vec3,
     pub sneaking: bool,
-    pub audios: bool,
 }
 
 impl Default for Player {
@@ -21,7 +20,6 @@ impl Default for Player {
             creative: false,
             velocity: Vec3::Y * 40.,
             sneaking: false,
-            audios: true,
         }
     }
 }

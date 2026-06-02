@@ -1,4 +1,4 @@
-use crate::player::Player;
+use crate::settings::GameSettings;
 use bevy::prelude::*;
 
 #[derive(Resource)]
@@ -24,9 +24,9 @@ pub struct MenuSfx;
 #[derive(Component)]
 pub struct InGameSfx;
 
-pub fn disable_enable_sfx(audios: Query<&mut AudioSink>, player: Single<&Player>) {
+pub fn disable_enable_sfx(audios: Query<&mut AudioSink>, settings: Res<GameSettings>) {
     for mut audio in audios {
-        if player.audios {
+        if settings.enable_audio {
             audio.unmute();
         } else {
             audio.mute();
