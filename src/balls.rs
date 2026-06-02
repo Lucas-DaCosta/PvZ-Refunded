@@ -1,4 +1,4 @@
-use crate::{InGameSfx, Player, SoundEffects};
+use crate::{InGameSfx, SoundEffects};
 use bevy::{audio::Volume, prelude::*};
 use bevy_rapier3d::prelude::*;
 use rand::{SeedableRng, seq::IndexedRandom};
@@ -52,35 +52,6 @@ impl FromWorld for BallData {
 pub struct Power {
     pub charging: bool,
     pub current: f32,
-}
-
-pub fn shoot_ball(
-    mouse_inputs: Res<ButtonInput<MouseButton>>,
-    player: Single<&mut Transform, (With<Player>, Without<Camera3d>)>,
-    player_cam: Single<&mut Transform, (With<Camera3d>, Without<Player>)>,
-    mut spawner: MessageWriter<BallSpawn>,
-    mut power: ResMut<Power>,
-    time: Res<Time>,
-) {
-    if power.charging {
-        if mouse_inputs.just_released(MouseButton::Left) {
-            spawner.write(BallSpawn {
-                position: player.transform_point(player_cam.translation),
-                velocity: player.rotation * player_cam.forward().as_vec3() * 2.5,
-                power: (power.current * 2.).exp(),
-            });
-        }
-        if mouse_inputs.pressed(MouseButton::Left) {
-            power.current += time.delta_secs();
-            power.current = power.current.clamp(1., 2.);
-        } else {
-            power.charging = false;
-        }
-    }
-    if mouse_inputs.just_pressed(MouseButton::Left) {
-        power.charging = true;
-        power.current = 1.;
-    }
 }
 
 pub fn spawn_ball(
