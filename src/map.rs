@@ -37,7 +37,7 @@ pub fn spawn_map(
         Collider::cuboid(2500., 0.1, 2500.),
     ));
     commands.spawn((
-        Transform::from_translation(Vec3::new(30., 10., 0.)),
+        Transform::from_translation(Vec3::new(30., 50., 0.)),
         Mesh3d(meshes.add(Cuboid::new(10., 100., 10.))),
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: Color::linear_rgb(0., 1., 0.),

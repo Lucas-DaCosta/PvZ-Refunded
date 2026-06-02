@@ -3,11 +3,15 @@ use bevy::prelude::*;
 #[derive(Resource, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub struct GameSettings {
     pub enable_audio: bool,
+    pub volume: f32,
 }
 
 impl Default for GameSettings {
     fn default() -> Self {
-        Self { enable_audio: true }
+        Self {
+            enable_audio: true,
+            volume: 0.,
+        }
     }
 }
 

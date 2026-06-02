@@ -1,5 +1,11 @@
-use crate::{MenuSfx, SoundEffects, buttons::ButtonAction};
-use bevy::{audio::Volume, prelude::*, ui::widget::Text};
+use crate::{MenuSfx, SoundEffects, buttons::ButtonAction, settings::GameSettings};
+use bevy::{
+    audio::Volume,
+    picking::hover::Hovered,
+    prelude::*,
+    ui::widget::Text,
+    ui_widgets::{Slider, SliderRange, SliderThumb, SliderValue, TrackClick, ValueChange},
+};
 
 #[derive(Component)]
 pub struct MenuUi;
@@ -184,4 +190,85 @@ pub fn disable_menu_visibility(visibility: Query<&mut Visibility, With<MenuUi>>)
     for mut vis in visibility {
         *vis = Visibility::Hidden;
     }
+}
+
+#[derive(Component)]
+pub struct VolumeSlider;
+
+#[derive(Component)]
+pub struct VolumeSliderThumb;
+
+pub fn setup_ui(mut commands: Commands, settings: Res<GameSettings>) {
+    commands
+        .spawn((
+            MenuUi,
+            // Slider rail
+            Node {
+                width: Val::Vw(20.),
+                height: Val::Px(12.),
+                left: Val::Vw(68.5),
+                top: Val::Vh(2.),
+                ..default()
+            },
+            VolumeSlider,
+            Hovered::default(),
+            Slider {
+                track_click: TrackClick::Snap,
+            },
+            SliderValue(settings.volume), // Init Value
+            SliderRange::new(0.0, 100.0),
+            BackgroundColor(Color::srgb(0.1, 0.1, 0.1)),
+            Visibility::Hidden,
+        ))
+        .with_children(|parent| {
+            // Invisible object for positionning thumb
+            parent
+                .spawn(Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.),
+                    right: Val::Px(12.),
+                    top: Val::Px(0.),
+                    bottom: Val::Px(0.),
+                    ..default()
+                })
+                .with_child((
+                    VolumeSliderThumb,
+                    SliderThumb,
+                    Node {
+                        width: Val::Px(12.),
+                        height: Val::Px(12.),
+                        position_type: PositionType::Absolute,
+                        left: Val::Percent(0.), // Automatically updated
+                        border_radius: BorderRadius::MAX,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.9, 0., 0.)),
+                ));
+        });
+}
+
+pub fn sync_slider_value(
+    e: On<ValueChange<f32>>,
+    mut settings: ResMut<GameSettings>,
+    sliders: Query<Entity, With<VolumeSlider>>,
+    mut commands: Commands,
+) {
+    settings.volume = e.value;
+
+    if let Ok(entity) = sliders.single() {
+        commands.entity(entity).insert(SliderValue(e.value));
+    }
+}
+
+pub fn update_slider_thumb(
+    sliders: Query<(&SliderValue, &SliderRange), With<VolumeSlider>>,
+    mut thumbs: Query<&mut Node, With<VolumeSliderThumb>>,
+) {
+    let Ok((value, range)) = sliders.single() else {
+        return;
+    };
+    let Ok(mut node) = thumbs.single_mut() else {
+        return;
+    };
+    node.left = Val::Percent(range.thumb_position(value.0) * 100.0);
 }

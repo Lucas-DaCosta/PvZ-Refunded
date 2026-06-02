@@ -1,3 +1,6 @@
+use bevy::input_focus::InputDispatchPlugin;
+use bevy::input_focus::tab_navigation::TabNavigationPlugin;
+use bevy::ui_widgets::UiWidgetsPlugins;
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use bevy_rapier3d::prelude::*;
 
@@ -20,7 +23,7 @@ use crate::hud::*;
 use crate::map::*;
 use crate::pause_menu::*;
 use crate::player::*;
-use crate::settings::GameSettings;
+use crate::settings::*;
 
 #[derive(States, Debug, Clone, Hash, PartialEq, Eq, Default)]
 enum GameState {
@@ -42,11 +45,22 @@ fn main() {
         DefaultPlugins,
         RapierPhysicsPlugin::<NoUserData>::default(),
         RapierDebugRenderPlugin::default(),
+        UiWidgetsPlugins,
+        InputDispatchPlugin,
+        TabNavigationPlugin,
     ));
     app.init_state::<GameState>();
     app.add_systems(
         Startup,
-        (spawn_camera, load_sfx, spawn_map, spawn_menu, spawn_hud).chain(),
+        (
+            spawn_camera,
+            load_sfx,
+            spawn_map,
+            spawn_menu,
+            spawn_hud,
+            setup_ui,
+        )
+            .chain(),
     );
     app.add_systems(
         OnEnter(GameState::Playing),
@@ -90,7 +104,9 @@ fn main() {
         )
             .chain(),
     );
+    app.add_systems(Update, update_slider_thumb);
     app.add_observer(apply_grab);
+    app.add_observer(sync_slider_value);
     app.add_message::<BallSpawn>();
     app.init_resource::<BallData>();
     app.insert_resource(settings);
