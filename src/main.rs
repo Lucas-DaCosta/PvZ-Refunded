@@ -31,6 +31,13 @@ enum GameState {
 
 fn main() {
     let mut app = App::new();
+    let settings = match GameSettings::deser("./saves/settings.json".to_owned()) {
+        Ok(deser) => deser,
+        Err(err) => {
+            println!("Failed to load settings file : {:#?}", err);
+            GameSettings::default()
+        }
+    };
     app.add_plugins((
         DefaultPlugins,
         RapierPhysicsPlugin::<NoUserData>::default(),
@@ -86,7 +93,7 @@ fn main() {
     app.add_observer(apply_grab);
     app.add_message::<BallSpawn>();
     app.init_resource::<BallData>();
-    app.insert_resource(GameSettings::default());
+    app.insert_resource(settings);
     app.insert_resource(Power {
         charging: false,
         current: 0.,

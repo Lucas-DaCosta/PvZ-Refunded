@@ -7,6 +7,8 @@ edition = "2024"
 bevy = { version = "0.18.1", features = ["jpeg", "mp3"]}
 bevy_rapier3d = { version = "0.33.0", features = [ "simd-stable", "async-collider" ] }
 rand = "*"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
 
 [profile.dev.package."*"]
 opt-level = 3

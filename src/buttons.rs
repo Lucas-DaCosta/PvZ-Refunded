@@ -1,4 +1,4 @@
-use crate::settings::GameSettings;
+use crate::{buttons::ButtonAction::QuitGame, settings::GameSettings};
 use bevy::prelude::*;
 
 #[derive(Component, PartialEq)]
@@ -13,12 +13,15 @@ pub fn handle_button(
         (Changed<Interaction>, With<Button>),
     >,
     mut settings: ResMut<GameSettings>,
+    mut app_exit: MessageWriter<AppExit>,
 ) {
     for (interaction, mut bg, action) in buttons {
         match interaction {
             Interaction::Pressed => match action {
                 ButtonAction::ToggleAudio => settings.enable_audio = !settings.enable_audio,
-                _ => {}
+                QuitGame => {
+                    app_exit.write(AppExit::Success);
+                }
             },
             Interaction::Hovered => bg.0 = Color::linear_rgba(0.5, 0.5, 0.5, 1.),
             Interaction::None => bg.0 = Color::linear_rgba(0., 0., 0., 0.),

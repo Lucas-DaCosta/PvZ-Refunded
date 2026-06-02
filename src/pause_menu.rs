@@ -121,8 +121,8 @@ pub fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
                     Node {
                         width: Val::Percent(90.),
                         height: Val::Percent(10.),
-                        margin: UiRect::all(Val::Percent(5.)),
-                        border: UiRect::vertical(Val::Px(2.)),
+                        margin: UiRect::all(Val::Percent(5.)).with_bottom(Val::Percent(0.)),
+                        border: UiRect::top(Val::Px(2.)),
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
@@ -130,6 +130,31 @@ pub fn spawn_menu(mut commands: Commands, sounds: Res<SoundEffects>) {
                 ))
                 .with_child((
                     Text::new("Audio : Enabled"),
+                    TextFont {
+                        font_size: 20.,
+                        ..Default::default()
+                    },
+                    Node {
+                        margin: UiRect::all(Val::Percent(2.5)),
+                        ..Default::default()
+                    },
+                ));
+            parent
+                .spawn((
+                    Button,
+                    ButtonAction::QuitGame,
+                    Node {
+                        width: Val::Percent(90.),
+                        height: Val::Percent(10.),
+                        margin: UiRect::horizontal(Val::Percent(5.)),
+                        border: UiRect::vertical(Val::Px(2.)),
+                        align_items: AlignItems::Center,
+                        ..Default::default()
+                    },
+                    BorderColor::all(Color::linear_rgba(1., 1., 1., 1.)),
+                ))
+                .with_child((
+                    Text::new("Quit"),
                     TextFont {
                         font_size: 20.,
                         ..Default::default()
