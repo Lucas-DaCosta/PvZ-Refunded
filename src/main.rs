@@ -102,6 +102,7 @@ fn main() {
             handle_button,
             disable_enable_sfx,
             update_button,
+            handle_input_ui,
         )
             .chain(),
     );

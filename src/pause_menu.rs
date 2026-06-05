@@ -1,6 +1,7 @@
 use crate::{MenuSfx, SoundEffects, buttons::ButtonAction, settings::GameSettings};
 use bevy::{
     audio::Volume,
+    input_focus::InputFocus,
     picking::hover::Hovered,
     prelude::*,
     ui_widgets::{Slider, SliderRange, SliderThumb, SliderValue, TrackClick, ValueChange},
@@ -195,6 +196,7 @@ pub fn spawn_input_ui(mut commands: Commands) {
             },
         ))
         .with_child((
+            Button,
             TextInputNode {
                 focus_on_pointer_down: true,
                 mode: TextInputMode::SingleLine,
@@ -210,21 +212,21 @@ pub fn spawn_input_ui(mut commands: Commands) {
         ));
 }
 
-// pub fn handle_input_ui(
-//     text_areas: Query<
-//         (&Interaction, Entity, &mut BackgroundColor),
-//         (Changed<Interaction>, (With<TextInputNode>, With<Button>)),
-//     >,
-//     mut focus: ResMut<InputFocus>,
-// ) {
-//     for (interaction, text, mut bg) in text_areas {
-//         match interaction {
-//             Interaction::Pressed => focus.0 = Some(text),
-//             Interaction::Hovered => bg.0 = Color::linear_rgba(1., 0., 0., 0.5),
-//             Interaction::None => bg.0 = Color::linear_rgba(0., 0., 0., 1.),
-//         }
-//     }
-// }
+pub fn handle_input_ui(
+    text_areas: Query<
+        (&Interaction, Entity, &mut BackgroundColor),
+        (Changed<Interaction>, (With<TextInputNode>, With<Button>)),
+    >,
+    mut focus: ResMut<InputFocus>,
+) {
+    for (interaction, text, mut bg) in text_areas {
+        match interaction {
+            Interaction::Pressed => focus.0 = Some(text),
+            Interaction::Hovered => bg.0 = Color::linear_rgba(1., 0., 0., 0.5),
+            Interaction::None => bg.0 = Color::linear_rgba(0., 0., 0., 1.),
+        }
+    }
+}
 
 pub fn enable_menu_visibility(visibility: Query<&mut Visibility, With<MenuUi>>) {
     for mut vis in visibility {
