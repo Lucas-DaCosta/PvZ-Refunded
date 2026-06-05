@@ -21,22 +21,33 @@ pub fn apply_grab(
     }
 }
 
-pub fn focus_event(mut events: MessageReader<WindowFocused>, mut commands: Commands) {
+pub fn focus_event(
+    mut events: MessageReader<WindowFocused>,
+    mut commands: Commands,
+    state: Res<State<GameState>>,
+) {
     if let Some(event) = events.read().last() {
-        commands.trigger(GrabEvent(event.focused));
+        if event.focused && *state.get() == GameState::Playing {
+            commands.trigger(GrabEvent(true));
+        } else if !event.focused {
+            commands.trigger(GrabEvent(false));
+        }
     }
 }
 
 pub fn toggle_grab(
-    mut window: Single<&mut Window, With<PrimaryWindow>>,
     mut commands: Commands,
     current_state: Res<State<GameState>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    window.focused = !window.focused;
-    commands.trigger(GrabEvent(window.focused));
     match current_state.get() {
-        GameState::Playing => next_state.set(GameState::Paused),
-        GameState::Paused => next_state.set(GameState::Playing),
+        GameState::Playing => {
+            commands.trigger(GrabEvent(false));
+            next_state.set(GameState::Paused)
+        }
+        GameState::Paused => {
+            commands.trigger(GrabEvent(true));
+            next_state.set(GameState::Playing)
+        }
     }
 }

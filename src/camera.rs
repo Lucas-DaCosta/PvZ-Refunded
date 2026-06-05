@@ -34,9 +34,6 @@ pub fn player_look(
     time: Res<Time>,
     window: Single<&Window, With<PrimaryWindow>>,
 ) {
-    if !window.focused {
-        return;
-    }
     let dt = time.delta_secs();
     let sensitivity = 100. / window.width().min(window.height());
 

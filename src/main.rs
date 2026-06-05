@@ -1,8 +1,8 @@
-use bevy::input_focus::InputDispatchPlugin;
 use bevy::input_focus::tab_navigation::TabNavigationPlugin;
 use bevy::ui_widgets::UiWidgetsPlugins;
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use bevy_rapier3d::prelude::*;
+use bevy_ui_text_input::TextInputPlugin;
 
 mod audios;
 mod balls;
@@ -46,8 +46,8 @@ fn main() {
         RapierPhysicsPlugin::<NoUserData>::default(),
         RapierDebugRenderPlugin::default(),
         UiWidgetsPlugins,
-        InputDispatchPlugin,
         TabNavigationPlugin,
+        TextInputPlugin,
     ));
     app.init_state::<GameState>();
     app.add_systems(
@@ -59,6 +59,7 @@ fn main() {
             spawn_menu,
             spawn_hud,
             setup_ui,
+            spawn_input_ui,
         )
             .chain(),
     );
@@ -82,7 +83,7 @@ fn main() {
     app.add_systems(
         Update,
         (
-            player_look,
+            player_look.run_if(in_state(GameState::Playing)),
             switch_gamemode,
             player_move.run_if(in_state(GameState::Playing)),
             player_sneak
