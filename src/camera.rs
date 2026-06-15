@@ -20,6 +20,7 @@ pub fn spawn_camera(mut commands: Commands) {
         ))
         .with_child((
             Camera3d::default(),
+            Camera2d::default(),
             Transform::from_translation(Vec3::new(0., 2.5, 0.)),
             InheritedVisibility::default(),
             ViewVisibility::default(),

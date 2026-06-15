@@ -14,6 +14,7 @@ mod map;
 mod pause_menu;
 mod player;
 mod settings;
+mod text_input_iu;
 use crate::audios::*;
 use crate::balls::*;
 use crate::buttons::*;
@@ -24,6 +25,7 @@ use crate::map::*;
 use crate::pause_menu::*;
 use crate::player::*;
 use crate::settings::*;
+use crate::text_input_iu::*;
 
 #[derive(States, Debug, Clone, Hash, PartialEq, Eq, Default)]
 enum GameState {
